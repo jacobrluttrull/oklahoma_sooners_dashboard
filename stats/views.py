@@ -1,29 +1,36 @@
+import os
 from django.shortcuts import render
-from .models import Game
-
+import cfbd
+from pydantic import StrictInt, StrictStr
 
 def home(request):
-    latest_game = Game.objects.first()
+    configuration = cfbd.Configuration(
+        access_token=os.environ.get('BEARER_TOKEN')
+    )
+    overall_record = "N/A"
+    conf_record = "N/A"
 
-    # Calculate season record dynamically from all games in database
-    wins = Game.objects.filter(result='W').count()
-    losses = Game.objects.filter(result='L').count()
-
-    # College football doesn't have ties, so just wins-losses
-    season_record = f"{wins}-{losses}"
-
-    # Dynamic message based on performance
-    if losses == 0 and wins > 0:
-        message = 'Boomer Sooner! Undefeated 2025 Season! 🔥'
-    else:
-        message = 'Boomer Sooner! Oklahoma Dashboard is live.'
+    with cfbd.ApiClient(configuration) as api_client:
+        api_instance = cfbd.GamesApi(api_client)
+        year = StrictInt(2025)
+        team = StrictStr("Oklahoma")
+        conference = StrictStr("SEC")
+        try:
+            api_response = api_instance.get_records(year=year, team=team, conference=conference)
+            print("The response of GamesApi->get_records:\n")
+            if api_response and len(api_response) > 0:
+                overall = api_response[0].total
+                overall_record = f"{overall.wins}-{overall.losses}"
+                conference = api_response[0].conference_games
+                conf_record = f"{conference.wins}-{conference.losses}"
+                print(f"Overall Record: {overall_record}, Conference Record: {conf_record}")
+        except Exception as e:
+            print("Error fetching data from CFBD API: %s\n" % e)
 
     context = {
-        'title': f'Oklahoma Sooners Dashboard ({season_record})',
-        'message': message,
-        'latest_game': latest_game,
-        'season_record': season_record,
-        'wins': wins,
-        'losses': losses,
+        'title': f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
+        'message': "Welcome to the Oklahoma Football Dashboard!",
+        'record': overall_record,
+        'conference_record': conf_record,
     }
     return render(request, 'stats/home.html', context)
