@@ -1,3 +1,4 @@
+import datetime
 import os
 from django.shortcuts import render
 import cfbd
@@ -10,11 +11,14 @@ def home(request):
     overall_record = "N/A"
     conf_record = "N/A"
 
+
+
     with cfbd.ApiClient(configuration) as api_client:
         api_instance = cfbd.GamesApi(api_client)
         year = StrictInt(2025)
         team = StrictStr("Oklahoma")
         conference = StrictStr("SEC")
+        next_game = None
         try:
             api_response = api_instance.get_records(year=year, team=team, conference=conference)
             print("The response of GamesApi->get_records:\n")
@@ -26,11 +30,25 @@ def home(request):
                 print(f"Overall Record: {overall_record}, Conference Record: {conf_record}")
         except Exception as e:
             print("Error fetching data from CFBD API: %s\n" % e)
+        try:
+            with cfbd.ApiClient(configuration) as api_client:
+                games_api = cfbd.GamesApi(api_client)
+                today = datetime.date.today()
+                games = games_api.get_games(year=year, team=team)
+                future_games = [g for g in games if hasattr(g, "start_date") and g.start_date.date() >= today]
+                if future_games:
+                    next_game = sorted(future_games, key=lambda g: g.start_date)[0]
+                    print(f"Next Game: {next_game.away_team} at {next_game.home_team}, Date: {next_game.start_date}")
+
+        except Exception as e:
+            print("Error fetching next game from CFBD API: %s\n" % e)
+
 
     context = {
         'title': f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
         'message': "Welcome to the Oklahoma Football Dashboard!",
         'record': overall_record,
         'conference_record': conf_record,
+        'next_game': next_game,
     }
     return render(request, 'stats/home.html', context)

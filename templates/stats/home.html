@@ -1,29 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Oklahoma Sooners Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #841617;">
         <div class="container">
-            <span class="navbar-brand">🏈 {{ title }}</span>
+            <span class="navbar-brand"> {{ title }}</span>
         </div>
     </nav>
 
     <div class="container mt-4">
         <div class="jumbotron text-center p-5 rounded text-white" style="background: linear-gradient(45deg, #841617, #a91b1c);">
             <h1 class="display-4">{{ message }}</h1>
-            <p class="lead">Undefeated 2025 Season - 4 Wins, 0 Losses!</p>
+            <p class="lead">Undefeated 2025 Season - {{ record }}</p>
+        </div>
+
+        <!-- Next Game Card -->
+        <div class="card mb-4">
+            <div class="card-header"><h5>Next Game</h5></div>
+            <div class="card-body">
+                {% if next_game %}
+                    <h4>{{ next_game.away_team }} at {{ next_game.home_team }}</h4>
+                    <p><strong>Date:</strong> {{ next_game.start_date|date:"F j, Y, g:i a" }}</p>
+                    {% if next_game.venue %}
+                        <p><strong>Venue:</strong> {{ next_game.venue }}</p>
+                    {% endif %}
+                {% else %}
+                    <p>No more scheduled games!</p>
+                {% endif %}
+            </div>
         </div>
 
         <div class="row mt-4">
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
-                        <h5>🏆 Latest Victory</h5>
+                        <h5> Latest Victory</h5>
                     </div>
                     <div class="card-body">
                         {% if latest_game %}
@@ -32,7 +48,7 @@
                             <p><i class="fas fa-map-marker-alt"></i> {{ latest_game.venue }}</p>
                             <p><i class="fas fa-users"></i> Attendance: {{ latest_game.attendance|floatformat:0 }}</p>
                             {% if latest_game.result == 'W' %}
-                                <span class="badge bg-success fs-6">✅ VICTORY</span>
+                                <span class="badge bg-success fs-6"> VICTORY</span>
                                 <span class="badge bg-primary fs-6">{{ latest_game.season_record }}</span>
                                 <span class="badge bg-secondary fs-6">{{ latest_game.conference_record }}</span>
                             {% endif %}
@@ -46,17 +62,16 @@
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
-                        <h5>📊 2025 Season Stats</h5>
+                        <h5> 2025 Season Stats</h5>
                     </div>
                     <div class="card-body">
-                        <h3 class="text-success">UNDEFEATED 🔥</h3>
-                        <p><strong>Record:</strong> {{ overall_record }}</p>
+                        <h3 class="text-success">UNDEFEATED </h3>
+                        <p><strong>Record:</strong> {{ record }}</p>
                         <p><strong>SEC Record:</strong> {{ conference_record }}</p>
                         <p><strong>Ranked Wins:</strong> 2 (Michigan, Auburn)</p>
                         <p><strong>Current Ranking:</strong> #11 (as of Sep 20)</p>
                         <small class="text-muted">Defense has 10+ sacks in recent games!</small>
                     </div>
-
                 </div>
             </div>
         </div>
