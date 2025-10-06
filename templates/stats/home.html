@@ -34,30 +34,33 @@
                 {% endif %}
             </div>
         </div>
+    <div class="card">
+      <div class="card-header">
+        <h5>Latest Victory</h5>
+      </div>
+      <div class="card-body">
+        {% if latest_victory %}
+          <h4>
+            {% if latest_victory.home_team == "Oklahoma" %}
+              Oklahoma {{ latest_victory.home_points }} - {{ latest_victory.away_points }} {{ latest_victory.away_team }}
+            {% else %}
+              {{ latest_victory.away_team }} {{ latest_victory.away_points }} - {{ latest_victory.home_points }} Oklahoma
+            {% endif %}
+          </h4>
+          <p><strong>Date:</strong> {{ latest_victory.start_date|date:"F j, Y" }}</p>
+          {% if latest_victory.venue %}
+            <p><strong>Venue:</strong> {{ latest_victory.venue }}</p>
+          {% endif %}
+          {% if latest_victory.attendance %}
+            <p><strong>Attendance:</strong> {{ latest_victory.attendance|floatformat:0 }}</p>
+          {% endif %}
+          <span class="badge bg-success fs-6">VICTORY</span>
+        {% else %}
+          <p class="text-muted">No victories to display yet!</p>
+        {% endif %}
+      </div>
+    </div>
 
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5> Latest Victory</h5>
-                    </div>
-                    <div class="card-body">
-                        {% if latest_game %}
-                            <h4><strong>Oklahoma {{ latest_game.oklahoma_score }} - {{ latest_game.opponent_score }} {{ latest_game.opponent.name }}</strong></h4>
-                            <p><strong>{{ latest_game.date|date:"F j, Y" }}</strong></p>
-                            <p><i class="fas fa-map-marker-alt"></i> {{ latest_game.venue }}</p>
-                            <p><i class="fas fa-users"></i> Attendance: {{ latest_game.attendance|floatformat:0 }}</p>
-                            {% if latest_game.result == 'W' %}
-                                <span class="badge bg-success fs-6"> VICTORY</span>
-                                <span class="badge bg-primary fs-6">{{ latest_game.season_record }}</span>
-                                <span class="badge bg-secondary fs-6">{{ latest_game.conference_record }}</span>
-                            {% endif %}
-                        {% else %}
-                            <p class="text-muted">No games added yet. Add the Auburn game!</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
 
             <div class="col-md-6">
                 <div class="card">
