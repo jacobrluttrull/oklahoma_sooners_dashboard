@@ -87,8 +87,5 @@ This project is built for educational purposes to:
 - Learn efficient data handling through caching and API integration.  
 - Build scalable, maintainable web applications using a modular design approach.  
 
----
-
-This is valid GitHub-flavored Markdown. When you upload this file to your repository, all headers, lists, and code blocks will render correctly on GitHub.
 
 
