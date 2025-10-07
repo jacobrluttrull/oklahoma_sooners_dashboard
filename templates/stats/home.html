@@ -16,8 +16,41 @@
     <div class="container mt-4">
         <div class="jumbotron text-center p-5 rounded text-white" style="background: linear-gradient(45deg, #841617, #a91b1c);">
             <h1 class="display-4">{{ message }}</h1>
-            <p class="lead">Undefeated 2025 Season - {{ record }}</p>
         </div>
+    <h2>Season Schedule</h2>
+    <table border="1" cellpadding="5" cellspacing="0" class="table table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Date</th>
+                <th>Opponent</th>
+                <th>Location</th>
+                <th>Result</th>
+                <th>Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for game in schedule %}
+            <tr>
+                <td> {{ game.date|date:"M, d, Y" }}</td>
+                <td> {{ game.opponent }}</td>
+                <td> {{ game.location }}</td>
+                <td> {{ game.score }}</td>
+                <td> {{ game.result }}</td>
+            <td>
+                {% if game.result == "W" %}
+                    <span class="badge bg-success fs-6">WIN</span>
+                {% elif game.result == "L" %}
+                    <span class="badge bg-danger fs-6">LOSS</span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6">TBD</span>
+                {% endif %}
+            </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
 
         <!-- Next Game Card -->
         <div class="card mb-4">

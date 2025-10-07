@@ -132,6 +132,60 @@ def home(request):
         except Exception as e:
             print(f"Error processing player stats: {e}")
 
+        # ----- SEASON SCHEDULE WITH RESULTS -----
+        try:
+            with cfbd.ApiClient(configuration) as api_client:
+                games_api = cfbd.GamesApi(api_client)
+                games = games_api.get_games(year=year, team=team)
+                schedule = []
+
+                for g in sorted(games, key=lambda x: x.start_date):
+                    if g.home_team == "Oklahoma":
+                        opponent = g.away_team
+                        is_home = True
+                        score_display = f"{g.home_points} - {g.away_points}" if g.home_points is not None else "TBD"
+                        if g.home_points is not None and g.away_points is not None:
+                            if g.home_points > g.away_points:
+                                result = "W"
+                            elif g.home_points < g.away_points:
+                                result = "L"
+                            else:
+                                result = ""
+                        else:
+                            result = ""
+                    else:
+                        opponent = g.home_team
+                        is_home = False
+                        score_display = f"{g.away_points} - {g.home_points}" if g.away_points is not None else "TBD"
+                        if g.home_points is not None and g.away_points is not None:
+                            if g.away_points > g.home_points:
+                                result = "W"
+                            elif g.away_points < g.home_points:
+                                result = "L"
+                            else:
+                                result = ""
+                        else:
+                            result = ""
+
+                    # Debugging output
+                    print(
+                        f"Game: {g.away_team} at {g.home_team} | "
+                        f"HomePts={g.home_points}, AwayPts={g.away_points} | "
+                        f"Oklahoma is {'home' if is_home else 'away'} | "
+                        f"Computed result='{result}'"
+                    )
+
+                    schedule.append({
+                        "date": g.start_date,
+                        "opponent": opponent,
+                        "location": "Home" if is_home else "Away",
+                        "score": score_display,
+                        "result": result
+                    })
+        except Exception as e:
+            print(f"Error fetching season schedule: {e}")
+            schedule = []
+
     # ----- CONTEXT -----
     context = {
         'title': f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
@@ -146,6 +200,7 @@ def home(request):
         'passing_tds': passing_tds,
         'rushing_tds': rushing_tds,
         'receiving_tds': receiving_tds,
+        'schedule': schedule,
     }
 
     return render(request, 'stats/home.html', context)
