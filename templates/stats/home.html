@@ -58,7 +58,8 @@
             <div class="card-body">
                 {% if next_game %}
                     <h4>{{ next_game.away_team }} at {{ next_game.home_team }}</h4>
-                    <p><strong>Date:</strong> {{ next_game.start_date|date:"F j, Y, g:i a" }}</p>
+                    <p><strong>Date:</strong> {{ local_start_date|date:"l, F j, Y" }}</p>
+                    <p><strong>Time:</strong> {{ local_start_date|date:"g:i A T" }}</p>
                     {% if next_game.venue %}
                         <p><strong>Venue:</strong> {{ next_game.venue }}</p>
                     {% endif %}

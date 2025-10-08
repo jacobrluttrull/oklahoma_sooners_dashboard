@@ -4,6 +4,8 @@ from django.shortcuts import render
 import cfbd
 from pydantic import StrictInt, StrictStr
 from django.core.cache import cache
+import pytz
+
 
 
 def get_stats_player(stats_list, player_name, stat_type):
@@ -69,7 +71,9 @@ def home(request):
                 future_games = [g for g in games if hasattr(g, "start_date") and g.start_date.date() >= today]
                 if future_games:
                     next_game = sorted(future_games, key=lambda g: g.start_date)[0]
-                    print(f"Next Game: {next_game.away_team} at {next_game.home_team}, Date: {next_game.start_date}")
+                    eastern = pytz.timezone('US/Eastern')
+                    local_start_date = next_game.start_date.astimezone(eastern)
+                    print(f"Next Game: {next_game.away_team} at {next_game.home_team}, Date: {local_start_date}")
         except Exception as e:
             print(f"Error fetching next game from CFBD API: {e}")
 
@@ -194,6 +198,7 @@ def home(request):
         'conference_record': conf_record,
         'next_game': next_game,
         'latest_victory': latest_victory,
+        'local_start_date': local_start_date,
         'passing_leader': passing_leader,
         'rushing_leader': rushing_leader,
         'receiving_leader': receiving_leader,
