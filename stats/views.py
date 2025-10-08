@@ -7,6 +7,48 @@ from django.core.cache import cache
 import pytz
 
 
+def get_rankings(rankings_api, year: int):
+    """Fetch and return AP Top 25 rankings by week."""
+    def normalize_name(name: str) -> str:
+        if not name:
+            return ""
+        return (
+            name.upper()
+            .replace(".", "")
+            .replace("&", "AND")
+            .replace("-", " ")
+            .strip()
+        )
+
+    all_rankings = rankings_api.get_rankings(year=year)
+    rankings_map = {}
+
+    for week_obj in all_rankings:
+        week_num = week_obj.week
+        for poll in week_obj.polls:
+            if poll.poll == "AP Top 25":
+                for r in poll.ranks:
+                    school = getattr(r, "school", None)
+                    rank_number = getattr(r, "rank", None)
+                    if school and rank_number is not None:
+                        rankings_map.setdefault(week_num, {})[normalize_name(school)] = rank_number
+
+    latest_week_with_rank = max(rankings_map.keys()) if rankings_map else None
+    return rankings_map, latest_week_with_rank
+
+
+def normalize_name(name: str) -> str:
+    """Normalize team names to improve matching between CFBD API datasets."""
+    if not name:
+        return ""
+    return (
+        name.upper()
+        .replace(".", "")
+        .replace("&", "AND")
+        .replace("-", " ")
+        .strip()
+    )
+
 
 def get_stats_player(stats_list, player_name, stat_type):
     for s in stats_list:
@@ -49,6 +91,7 @@ def home(request):
         passing_leader = None
         rushing_leader = None
         receiving_leader = None
+        oklahoma_rank = None
 
         # ----- TEAM RECORDS -----
         try:
@@ -62,6 +105,16 @@ def home(request):
         except Exception as e:
             print(f"Error fetching data from CFBD API: {e}")
 
+        # ----- GET AP RANKINGS -----
+        with cfbd.ApiClient(configuration) as api_client:
+            rankings_api = cfbd.RankingsApi(api_client)
+            rankings_map, latest_week_with_rank = get_rankings(rankings_api, year)
+            oklahoma_key = normalize_name("Oklahoma")
+            if latest_week_with_rank and oklahoma_key in rankings_map[latest_week_with_rank]:
+                oklahoma_rank = rankings_map[latest_week_with_rank][oklahoma_key]
+            else:
+                oklahoma_rank = None
+
         # ----- NEXT GAME -----
         try:
             with cfbd.ApiClient(configuration) as api_client:
@@ -73,10 +126,20 @@ def home(request):
                     next_game = sorted(future_games, key=lambda g: g.start_date)[0]
                     eastern = pytz.timezone('US/Eastern')
                     local_start_date = next_game.start_date.astimezone(eastern)
-                    print(f"Next Game: {next_game.away_team} at {next_game.home_team}, Date: {local_start_date}")
+
+                    # Add opponent and OU ranks
+                    opponent_key = normalize_name(next_game.away_team if next_game.home_team == "Oklahoma" else next_game.home_team)
+                    opponent_rank = None
+                    if latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
+                        opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
+
+                    next_game.opponent_rank = opponent_rank
+                    next_game.oklahoma_rank = oklahoma_rank
+
+                    print(f"Next Game: {next_game.away_team} at {next_game.home_team}, Date: {local_start_date}, "
+                          f"OU Rank: {oklahoma_rank}, Opp Rank: {opponent_rank}")
         except Exception as e:
             print(f"Error fetching next game from CFBD API: {e}")
-
         # ----- LATEST VICTORY -----
         try:
             with cfbd.ApiClient(configuration) as api_client:
@@ -86,13 +149,35 @@ def home(request):
                 past_games = [
                     g for g in games
                     if hasattr(g, "start_date") and g.start_date.date() < today and (
-                        (g.home_team == "Oklahoma" and g.home_points > g.away_points) or
-                        (g.away_team == "Oklahoma" and g.away_points > g.home_points)
+                            (g.home_team == "Oklahoma" and g.home_points > g.away_points) or
+                            (g.away_team == "Oklahoma" and g.away_points > g.home_points)
                     )
                 ]
                 if past_games:
-                    latest_victory = sorted(past_games, key=lambda g: g.start_date, reverse=True)[0]
-                    print(f"Latest Victory: {latest_victory.away_team} at {latest_victory.home_team}, Date: {latest_victory.start_date}")
+                    latest_victory_obj = sorted(past_games, key=lambda g: g.start_date, reverse=True)[0]
+
+                    opponent_key = normalize_name(
+                        latest_victory_obj.away_team if latest_victory_obj.home_team == "Oklahoma"
+                        else latest_victory_obj.home_team
+                    )
+                    opponent_rank = None
+                    if latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
+                        opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
+
+                    latest_victory = {
+                        "away_team": latest_victory_obj.away_team,
+                        "home_team": latest_victory_obj.home_team,
+                        "away_points": latest_victory_obj.away_points,
+                        "home_points": latest_victory_obj.home_points,
+                        "venue": getattr(latest_victory_obj, "venue", None),
+                        "attendance": getattr(latest_victory_obj, "attendance", None),
+                        "start_date": latest_victory_obj.start_date,
+                        "oklahoma_rank": oklahoma_rank,
+                        "opponent_rank": opponent_rank
+                    }
+
+                    print(f"Latest Victory: {latest_victory['away_team']} at {latest_victory['home_team']}, "
+                          f"OU Rank: {oklahoma_rank}, Opp Rank: {opponent_rank}")
         except Exception as e:
             print(f"Error fetching latest victory from CFBD API: {e}")
 
@@ -114,7 +199,6 @@ def home(request):
                 rushing_stats = player_stats_api.get_player_season_stats(year=year, team=team, category="rushing")
                 receiving_stats = player_stats_api.get_player_season_stats(year=year, team=team, category="receiving")
 
-            # Cache for 10 minutes (600 seconds)
             cache.set_many({
                 passing_key: passing_stats,
                 rushing_key: rushing_stats,
@@ -123,7 +207,6 @@ def home(request):
         else:
             print("Cache hit — using stored player stats")
 
-        # ----- PROCESS STATS -----
         try:
             passing_leader = get_stat_leader(passing_stats, stat_type="YDS")
             rushing_leader = get_stat_leader(rushing_stats, stat_type="YDS")
@@ -136,61 +219,73 @@ def home(request):
         except Exception as e:
             print(f"Error processing player stats: {e}")
 
-        # ----- SEASON SCHEDULE WITH RESULTS -----
+        # ----- SEASON SCHEDULE WITH RESULTS + RANKINGS -----
         try:
             with cfbd.ApiClient(configuration) as api_client:
                 games_api = cfbd.GamesApi(api_client)
                 games = games_api.get_games(year=year, team=team)
                 schedule = []
+                ranked_wins = []
 
                 for g in sorted(games, key=lambda x: x.start_date):
                     if g.home_team == "Oklahoma":
                         opponent = g.away_team
                         is_home = True
                         score_display = f"{g.home_points} - {g.away_points}" if g.home_points is not None else "TBD"
+                        result = ""
                         if g.home_points is not None and g.away_points is not None:
                             if g.home_points > g.away_points:
                                 result = "W"
                             elif g.home_points < g.away_points:
                                 result = "L"
-                            else:
-                                result = ""
-                        else:
-                            result = ""
                     else:
                         opponent = g.home_team
                         is_home = False
                         score_display = f"{g.away_points} - {g.home_points}" if g.away_points is not None else "TBD"
+                        result = ""
                         if g.home_points is not None and g.away_points is not None:
                             if g.away_points > g.home_points:
                                 result = "W"
                             elif g.away_points < g.home_points:
                                 result = "L"
-                            else:
-                                result = ""
-                        else:
-                            result = ""
 
-                    # Debugging output
+                    week_num = getattr(g, "week", None)
+                    opponent_rank = None
+                    is_ranked = False
+                    opponent_key = normalize_name(opponent)
+
+                    if week_num in rankings_map and opponent_key in rankings_map[week_num]:
+                        opponent_rank = rankings_map[week_num][opponent_key]
+                        is_ranked = True
+                    elif latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
+                        opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
+                        is_ranked = True
+
                     print(
-                        f"Game: {g.away_team} at {g.home_team} | "
-                        f"HomePts={g.home_points}, AwayPts={g.away_points} | "
-                        f"Oklahoma is {'home' if is_home else 'away'} | "
-                        f"Computed result='{result}'"
+                        f"Week {week_num}: {g.away_team} at {g.home_team} | "
+                        f"Rank: {opponent_rank if opponent_rank else 'Unranked'} | "
+                        f"Result: {result}"
                     )
 
-                    schedule.append({
+                    game_data = {
                         "date": g.start_date,
                         "opponent": opponent,
                         "location": "Home" if is_home else "Away",
                         "score": score_display,
-                        "result": result
-                    })
+                        "result": result,
+                        "is_ranked": is_ranked,
+                        "opponent_rank": opponent_rank,
+                    }
+                    schedule.append(game_data)
+
+                    if is_ranked and result == "W":
+                        ranked_wins.append(game_data)
+
         except Exception as e:
             print(f"Error fetching season schedule: {e}")
             schedule = []
+            ranked_wins = []
 
-    # ----- CONTEXT -----
     context = {
         'title': f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
         'message': "Welcome to the Oklahoma Football Dashboard!",
