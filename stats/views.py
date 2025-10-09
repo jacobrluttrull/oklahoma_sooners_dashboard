@@ -109,11 +109,12 @@ def home(request):
         with cfbd.ApiClient(configuration) as api_client:
             rankings_api = cfbd.RankingsApi(api_client)
             rankings_map, latest_week_with_rank = get_rankings(rankings_api, year)
-            oklahoma_key = normalize_name("Oklahoma")
-            if latest_week_with_rank and oklahoma_key in rankings_map[latest_week_with_rank]:
-                oklahoma_rank = rankings_map[latest_week_with_rank][oklahoma_key]
-            else:
-                oklahoma_rank = None
+
+        oklahoma_key = normalize_name("Oklahoma")
+        if latest_week_with_rank and oklahoma_key in rankings_map[latest_week_with_rank]:
+            oklahoma_rank = rankings_map[latest_week_with_rank][oklahoma_key]
+        else:
+            oklahoma_rank = None
 
         # ----- NEXT GAME -----
         try:
@@ -122,24 +123,35 @@ def home(request):
                 today = datetime.date.today()
                 games = games_api.get_games(year=year, team=team)
                 future_games = [g for g in games if hasattr(g, "start_date") and g.start_date.date() >= today]
+
                 if future_games:
-                    next_game = sorted(future_games, key=lambda g: g.start_date)[0]
+                    next_g = sorted(future_games, key=lambda g: g.start_date)[0]
                     eastern = pytz.timezone('US/Eastern')
-                    local_start_date = next_game.start_date.astimezone(eastern)
+                    local_start_date = next_g.start_date.astimezone(eastern)
 
                     # Add opponent and OU ranks
-                    opponent_key = normalize_name(next_game.away_team if next_game.home_team == "Oklahoma" else next_game.home_team)
+                    opponent_team = next_g.away_team if next_g.home_team == "Oklahoma" else next_g.home_team
+                    opponent_key = normalize_name(opponent_team)
                     opponent_rank = None
                     if latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
                         opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
 
-                    next_game.opponent_rank = opponent_rank
-                    next_game.oklahoma_rank = oklahoma_rank
+                    # Wrap next_game into a dict (instead of mutating CFBD object)
+                    next_game = {
+                        "away_team": next_g.away_team,
+                        "home_team": next_g.home_team,
+                        "venue": getattr(next_g, "venue", None),
+                        "start_date": next_g.start_date,
+                        "local_start_date": local_start_date,
+                        "oklahoma_rank": oklahoma_rank,
+                        "opponent_rank": opponent_rank
+                    }
 
-                    print(f"Next Game: {next_game.away_team} at {next_game.home_team}, Date: {local_start_date}, "
+                    print(f"Next Game: {next_g.away_team} at {next_g.home_team}, Date: {local_start_date}, "
                           f"OU Rank: {oklahoma_rank}, Opp Rank: {opponent_rank}")
         except Exception as e:
             print(f"Error fetching next game from CFBD API: {e}")
+
         # ----- LATEST VICTORY -----
         try:
             with cfbd.ApiClient(configuration) as api_client:
@@ -149,17 +161,19 @@ def home(request):
                 past_games = [
                     g for g in games
                     if hasattr(g, "start_date") and g.start_date.date() < today and (
-                            (g.home_team == "Oklahoma" and g.home_points > g.away_points) or
-                            (g.away_team == "Oklahoma" and g.away_points > g.home_points)
+                        (g.home_team == "Oklahoma" and g.home_points > g.away_points) or
+                        (g.away_team == "Oklahoma" and g.away_points > g.home_points)
                     )
                 ]
                 if past_games:
                     latest_victory_obj = sorted(past_games, key=lambda g: g.start_date, reverse=True)[0]
 
-                    opponent_key = normalize_name(
-                        latest_victory_obj.away_team if latest_victory_obj.home_team == "Oklahoma"
+                    opponent_team = (
+                        latest_victory_obj.away_team
+                        if latest_victory_obj.home_team == "Oklahoma"
                         else latest_victory_obj.home_team
                     )
+                    opponent_key = normalize_name(opponent_team)
                     opponent_rank = None
                     if latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
                         opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
@@ -293,7 +307,6 @@ def home(request):
         'conference_record': conf_record,
         'next_game': next_game,
         'latest_victory': latest_victory,
-        'local_start_date': local_start_date,
         'passing_leader': passing_leader,
         'rushing_leader': rushing_leader,
         'receiving_leader': receiving_leader,
