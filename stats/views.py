@@ -317,3 +317,52 @@ def home(request):
     }
 
     return render(request, 'stats/home.html', context)
+
+def boxscore(request):
+    configuration = cfbd.Configuration(access_token=os.environ.get('BEARER_TOKEN'))
+
+    with cfbd.ApiClient(configuration) as api_client:
+        games_api = cfbd.GamesApi(api_client)
+        stats_api = cfbd.StatsApi(api_client)
+        team = "Oklahoma"
+        year = 2025
+
+        games = games_api.get_games(year=year, team=team)
+        today = datetime.date.today()
+        past_games = [
+            g for g in games
+            if hasattr(g, "start_date") and g.start_date.date() < today and (
+                (g.home_team == team and g.home_points > g.away_points) or
+                (g.away_team == team and g.away_points > g.home_points)
+            )
+
+        ]
+        if not past_games:
+            context = {
+                'title': "No Past Games",
+                'message': "No past games found for the specified team and year.",
+            }
+            return render(request, 'stats/boxscore.html', context)
+        latest_game = sorted(past_games, key=lambda g: g.start_date, reverse=True)[0]
+
+        team_stats = stats_api.get_team_stats(year=year, team=team,)
+        team_game_stats = {
+            s for s in team_stats if s.opponent == (latest_game.away_team if latest_game.home_team == team else latest_game.home_team)
+
+        }
+        player_stats = stats_api.get_player_game_stats(year=year, team=team, game_id=latest_game.id)
+        passing = [s for s in player_stats if s.stat_type.lower() in ["pass_att", "pass_cmp", "pass_yds", "pass_tds"]]
+        rushing = [s for s in player_stats if s.stat_type.lower() in ["rush_att", "rush_yds", "rush_td"]]
+        receiving = [s for s in player_stats if s.stat_type.lower() in ["rec", "rec_yds", "rec_td"]]
+
+        context = {
+            "latest_game": latest_game,
+            "home_team": latest_game.home_team,
+            "away_team": latest_game.away_team,
+            "team_stats": team_game_stats,
+            "passing_stats": passing,
+            "rushing_stats": rushing,
+            "receiving_stats": receiving,
+
+        }
+        return render(request, 'stats/boxscore.html', context)

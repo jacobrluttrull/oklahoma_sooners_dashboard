@@ -98,6 +98,8 @@
         <div class="card mb-4">
             <div class="card-header"><h5>Latest Victory</h5></div>
             <div class="card-body">
+            <a href="{% url 'stats:boxscore' %}" class="btn btn-primary mt-3">View Latest Box Score</a>
+                {% comment %} Display latest victory details if available {% endcomment %}
                 {% if latest_victory %}
                     <h4>
                         {% if latest_victory.home_team == "Oklahoma" %}

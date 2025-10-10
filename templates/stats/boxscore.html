@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>
+        {{ latest_game.away_team }} @ {{ latest_game.home_team }} – {{ latest_game.start_date|date:"M d, Y" }}
+    </h2>
+
+    <hr>
+
+    {% if team_stats %}
+        <h4>Team Stats</h4>
+        <ul>
+            {% for stat in team_stats %}
+                <li>{{ stat.category }}: {{ stat.stat }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if passing %}
+        <h4>Passing</h4>
+        <ul>
+            {% for stat in passing %}
+                <li>{{ stat.player }} — {{ stat.stat_type }}: {{ stat.stat }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if rushing %}
+        <h4>Rushing</h4>
+        <ul>
+            {% for stat in rushing %}
+                <li>{{ stat.player }} — {{ stat.stat_type }}: {{ stat.stat }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if receiving %}
+        <h4>Receiving</h4>
+        <ul>
+            {% for stat in receiving %}
+                <li>{{ stat.player }} — {{ stat.stat_type }}: {{ stat.stat }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <a href="{% url 'home' %}" class="btn btn-secondary mt-3">← Back to Dashboard</a>
+</div>
+{% endblock %}
