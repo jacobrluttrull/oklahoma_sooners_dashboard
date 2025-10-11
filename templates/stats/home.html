@@ -83,8 +83,8 @@
                         {% endif %}
                     </h4>
 
-                    <p><strong>Date:</strong> {{ local_start_date|date:"l, F j, Y" }}</p>
-                    <p><strong>Time:</strong> {{ local_start_date|date:"g:i A T" }}</p>
+                    <p><strong>Date:</strong> {{ next_game.start_date|date:"l, F j, Y" }}</p>
+                    <p><strong>Time:</strong> {{ next_game.start_date|date:"g:i A T" }}</p>
                     {% if next_game.venue %}
                         <p><strong>Venue:</strong> {{ next_game.venue }}</p>
                     {% endif %}
