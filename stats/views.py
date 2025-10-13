@@ -7,6 +7,7 @@ from django.core.cache import cache
 import pytz
 
 
+
 def get_rankings(rankings_api, year: int):
     """Fetch and return AP Top 25 rankings by week."""
     def normalize_name(name: str) -> str:
@@ -322,61 +323,89 @@ def boxscore(request):
 
     with cfbd.ApiClient(configuration) as api_client:
         games_api = cfbd.GamesApi(api_client)
-        stats_api = cfbd.StatsApi(api_client)
 
         team = "Oklahoma"
         year = 2025
         today = datetime.date.today()
 
-        # Get all games for the year
+        # --- All OU games this year ---
         games = games_api.get_games(year=year, team=team)
 
-        # Filter for past games (that Oklahoma has already played)
-        past_games = [
+        # Completed games: both scores present & in the past
+        completed = [
             g for g in games
-            if hasattr(g, "start_date") and g.start_date.date() < today and (
-                (g.home_team == team and g.home_points is not None and g.home_points > g.away_points) or
-                (g.away_team == team and g.away_points is not None and g.away_points > g.home_points)
-            )
+            if hasattr(g, "start_date") and g.start_date.date() < today
+            and g.home_points is not None and g.away_points is not None
         ]
+        if not completed:
+            return render(request, "stats/boxscore.html", {
+                "title": "No Games Available",
+                "message": "No completed games found for this season."
+            })
 
-        # Handle no completed games gracefully
-        if not past_games:
-            context = {
-                "title": "No Past Games",
-                "message": "No past games found for the specified team and year.",
-            }
-            return render(request, "stats/boxscore.html", context)
-
-        # Get the most recent completed game
-        latest_game = sorted(past_games, key=lambda g: g.start_date, reverse=True)[0]
-
-        # Identify opponent
+        # Latest completed game
+        latest_game = sorted(completed, key=lambda g: g.start_date, reverse=True)[0]
         opponent = latest_game.away_team if latest_game.home_team == team else latest_game.home_team
+        game_week = latest_game.week
 
+        # --- Pull player + team stats for that WEEK ---
+        try:
+            # Per-player rows for the week (stat_type, stat, player, etc.)
+            player_stats = games_api.get_game_player_stats(year=year, week=game_week, team=team)
+            # Team stat rows for the week (stat_type, stat)
+            team_stats = games_api.get_game_team_stats(year=year, week=game_week, team=team)
+        except Exception as e:
+            print(f"Error fetching game stats: {e}")
+            return render(request, "stats/boxscore.html", {
+                "title": "Error",
+                "message": "Unable to retrieve game stats right now."
+            })
 
-        team_game_stats = [
-            s for s in stats_api.get_team_stats(year=year, team=team)
-            if hasattr(s, "opponent") and s.opponent == opponent
-        ]
+        # --- Classify player stats by stat_type ---
+        def classify(stat_type: str) -> str:
+            st = (stat_type or "").lower()
+            # receiving first to avoid 'rec' being mistaken
+            if "rec" in st:                 # rec, rec_yds, rec_td, receptions, receivingYards
+                return "receiving"
+            if "rush" in st:                # rush_att, rush_yds, rushingYards, rushingTDs
+                return "rushing"
+            if "pass" in st:                # pass_att, pass_cmp, pass_yds, passingYards, interceptions (QB stat appears as 'int' sometimes)
+                return "passing"
+            # crude defensive bucket
+            if any(x in st for x in ["tackle", "sack", "tfl", "int", "ff", "fr", "qb_hurry", "deflect", "pd"]):
+                return "defensive"
+            return "other"
 
-        # Get individual player game stats for this game
-        player_stats = stats_api.get_player_season_stats(year=year, team=team)
+        passing_stats, rushing_stats, receiving_stats, defensive_stats = [], [], [], []
 
-        # Separate player stats by category
-        passing = [s for s in player_stats if s.stat_type.lower() in ["pass_att", "pass_cmp", "pass_yds", "pass_tds"]]
-        rushing = [s for s in player_stats if s.stat_type.lower() in ["rush_att", "rush_yds", "rush_td"]]
-        receiving = [s for s in player_stats if s.stat_type.lower() in ["rec", "rec_yds", "rec_td"]]
+        for s in player_stats:
+            bucket = classify(getattr(s, "stat_type", ""))
+            row = {
+                "player": getattr(s, "player", "Unknown"),
+                "stat_type": getattr(s, "stat_type", ""),
+                "stat": getattr(s, "stat", ""),
+            }
+            if bucket == "passing":
+                passing_stats.append(row)
+            elif bucket == "rushing":
+                rushing_stats.append(row)
+            elif bucket == "receiving":
+                receiving_stats.append(row)
+            elif bucket == "defensive":
+                defensive_stats.append(row)
+            # ignore "other" for now
 
-        # Build context for template
         context = {
             "latest_game": latest_game,
-            "home_team": latest_game.home_team,
-            "away_team": latest_game.away_team,
-            "team_stats": team_game_stats,
-            "passing_stats": passing,
-            "rushing_stats": rushing,
-            "receiving_stats": receiving,
+            "opponent": opponent,
+            "passing_stats": passing_stats,
+            "rushing_stats": rushing_stats,
+            "receiving_stats": receiving_stats,
+            "defensive_stats": defensive_stats,
+            "team_stats": team_stats,   # NOTE: these have stat_type/stat fields
         }
 
         return render(request, "stats/boxscore.html", context)
+
+
+

@@ -1,48 +1,160 @@
 {% extends "base.html" %}
-
 {% block content %}
 <div class="container mt-4">
-    <h2>
-        {{ latest_game.away_team }} @ {{ latest_game.home_team }} – {{ latest_game.start_date|date:"M d, Y" }}
-    </h2>
 
-    <hr>
+    <!-- Game Header -->
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-uppercase">
+            {{ latest_game.away_team }} @ {{ latest_game.home_team }}
+        </h2>
+        <p class="text-muted">{{ latest_game.start_date|date:"F j, Y" }}</p>
+    </div>
 
+    <!-- Team Stats -->
     {% if team_stats %}
-        <h4>Team Stats</h4>
-        <ul>
-            {% for stat in team_stats %}
-                <li>{{ stat.category }}: {{ stat.stat }}</li>
-            {% endfor %}
-        </ul>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h4 class="card-title text-center mb-3 text-primary fw-semibold">Team Stats</h4>
+            <div class="row">
+                {% for stat in team_stats %}
+                  <div class="col-md-6 mb-2">
+                      <div class="d-flex justify-content-between border-bottom pb-1">
+                          <span class="fw-semibold">{{ stat.stat_type|title }}</span>
+                          <span>{{ stat.stat }}</span>
+                      </div>
+                  </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
     {% endif %}
 
-    {% if passing %}
-        <h4>Passing</h4>
-        <ul>
-            {% for stat in passing %}
-                <li>{{ stat.player }} — {{ stat.stat_type }}: {{ stat.stat }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
+    <div class="row">
 
-    {% if rushing %}
-        <h4>Rushing</h4>
-        <ul>
-            {% for stat in rushing %}
-                <li>{{ stat.player }} — {{ stat.stat_type }}: {{ stat.stat }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
+        <!-- Passing -->
+        {% if passing_stats %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center text-danger fw-bold">Passing</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Player</th>
+                                    <th>Type</th>
+                                    <th>Stat</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in passing_stats %}
+                                <tr>
+                                    <td>{{ stat.player }}</td>
+                                    <td>{{ stat.stat_type|title }}</td>
+                                    <td>{{ stat.stat }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
-    {% if receiving %}
-        <h4>Receiving</h4>
-        <ul>
-            {% for stat in receiving %}
-                <li>{{ stat.player }} — {{ stat.stat_type }}: {{ stat.stat }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
+        <!-- Rushing -->
+        {% if rushing_stats %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center text-success fw-bold">Rushing</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Player</th>
+                                    <th>Type</th>
+                                    <th>Stat</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in rushing_stats %}
+                                <tr>
+                                    <td>{{ stat.player }}</td>
+                                    <td>{{ stat.stat_type|title }}</td>
+                                    <td>{{ stat.stat }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
+        <!-- Receiving -->
+        {% if receiving_stats %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center text-primary fw-bold">Receiving</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Player</th>
+                                    <th>Type</th>
+                                    <th>Stat</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in receiving_stats %}
+                                <tr>
+                                    <td>{{ stat.player }}</td>
+                                    <td>{{ stat.stat_type|title }}</td>
+                                    <td>{{ stat.stat }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Defense -->
+        {% if defensive_stats %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center text-dark fw-bold">Defense</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Player</th>
+                                    <th>Type</th>
+                                    <th>Stat</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in defensive_stats %}
+                                <tr>
+                                    <td>{{ stat.player }}</td>
+                                    <td>{{ stat.stat_type|title }}</td>
+                                    <td>{{ stat.stat }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
 </div>
 {% endblock %}
