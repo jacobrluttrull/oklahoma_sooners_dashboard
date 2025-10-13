@@ -91,7 +91,7 @@ def home(request):
         passing_leader = None
         rushing_leader = None
         receiving_leader = None
-        oklahoma_rank = None
+
 
         # ----- TEAM RECORDS -----
         try:
@@ -298,7 +298,6 @@ def home(request):
         except Exception as e:
             print(f"Error fetching season schedule: {e}")
             schedule = []
-            ranked_wins = []
 
     context = {
         'title': f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
