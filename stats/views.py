@@ -11,7 +11,7 @@ from .cfb_api import (
     fetch_latest_victory,
     fetch_player_stats
 )
-
+##home view
 def home(request):
     # ----- CONFIG -----
     year = 2025
