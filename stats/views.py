@@ -9,9 +9,10 @@ from .cfb_api import (
     fetch_team_record,
     fetch_next_game,
     fetch_latest_victory,
-    fetch_player_stats
+    fetch_player_stats,
+    fetch_and_cache_schedule,
 )
-##home view
+# home view
 def home(request):
     # ----- CONFIG -----
     year = 2025
@@ -53,58 +54,7 @@ def home(request):
 
     # ----- SCHEDULE (inline for now) -----
     # Keeping schedule inline because it combines multiple datasets dynamically
-    schedule = []
-    try:
-        with cfbd.ApiClient(configuration) as api_client:
-            games_api = cfbd.GamesApi(api_client)
-            games = games_api.get_games(year=year, team=team)
-            for g in sorted(games, key=lambda x: x.start_date):
-                if g.home_team == "Oklahoma":
-                    opponent = g.away_team
-                    is_home = True
-                    score_display = f"{g.home_points} - {g.away_points}" if g.home_points is not None else "TBD"
-                    result = ""
-                    if g.home_points is not None and g.away_points is not None:
-                        if g.home_points > g.away_points:
-                            result = "W"
-                        elif g.home_points < g.away_points:
-                            result = "L"
-                else:
-                    opponent = g.home_team
-                    is_home = False
-                    score_display = f"{g.away_points} - {g.home_points}" if g.away_points is not None else "TBD"
-                    result = ""
-                    if g.home_points is not None and g.away_points is not None:
-                        if g.away_points > g.home_points:
-                            result = "W"
-                        elif g.away_points < g.home_points:
-                            result = "L"
-
-                week_num = getattr(g, "week", None)
-                opponent_key = normalize_name(opponent)
-                opponent_rank = None
-                is_ranked = False
-
-                if week_num in rankings_map and opponent_key in rankings_map[week_num]:
-                    opponent_rank = rankings_map[week_num][opponent_key]
-                    is_ranked = True
-                elif latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
-                    opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
-                    is_ranked = True
-
-                game_data = {
-                    "date": g.start_date,
-                    "opponent": opponent,
-                    "location": "Home" if is_home else "Away",
-                    "score": score_display,
-                    "result": result,
-                    "is_ranked": is_ranked,
-                    "opponent_rank": opponent_rank,
-                }
-                schedule.append(game_data)
-
-    except Exception as e:
-        print(f"Error fetching season schedule: {e}")
+    schedule = fetch_and_cache_schedule(configuration, year, team, rankings_map, latest_week_with_rank)
 
     # ----- CONTEXT -----
     context = {

@@ -33,6 +33,8 @@ class Game(models.Model):
     season_record = models.CharField(max_length=20, blank=True)
     conference_record = models.CharField(max_length=20, blank=True)
 
+    last_updated = models.DateTimeField(auto_now=True)
+
     def save(self, *args, **kwargs):
         # Auto-determine result (Win or Loss only)
         if self.oklahoma_score > self.opponent_score:
