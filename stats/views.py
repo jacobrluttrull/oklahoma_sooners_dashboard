@@ -1,6 +1,9 @@
+
 import datetime
-from django.shortcuts import render
 import os
+
+from django.shortcuts import render
+
 from .cfb_api import (
     get_rankings,
     normalize_name,
@@ -12,84 +15,8 @@ from .cfb_api import (
     fetch_player_stats,
     fetch_and_cache_schedule,
 )
-# home view
-def home(request):
-    # ----- CONFIG -----
-    year = 2025
-    team = "Oklahoma"
-    conference = "SEC"
-
-    # ----- TEAM RECORDS -----
-    overall_record, conf_record = fetch_team_record(year, team, conference)
-
-    # ----- RANKINGS -----
-    import cfbd
-    from cfbd import RankingsApi
-    configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
-    with cfbd.ApiClient(configuration) as api_client:
-        rankings_api = RankingsApi(api_client)
-        rankings_map, latest_week_with_rank = get_rankings(rankings_api, year)
-
-    oklahoma_key = normalize_name("Oklahoma")
-    oklahoma_rank = None
-    if latest_week_with_rank and oklahoma_key in rankings_map[latest_week_with_rank]:
-        oklahoma_rank = rankings_map[latest_week_with_rank][oklahoma_key]
-
-    # ----- NEXT GAME -----
-    next_game = fetch_next_game(year, team, rankings_map, latest_week_with_rank, oklahoma_rank)
-
-    # ----- LATEST VICTORY -----
-    latest_victory = fetch_latest_victory(year, team, rankings_map, latest_week_with_rank, oklahoma_rank)
-
-    # ----- PLAYER STATS -----
-    passing_stats, rushing_stats, receiving_stats = fetch_player_stats(year, team)
-
-    passing_leader = get_stat_leader(passing_stats, stat_type="YDS")
-    rushing_leader = get_stat_leader(rushing_stats, stat_type="YDS")
-    receiving_leader = get_stat_leader(receiving_stats, stat_type="YDS")
-
-    passing_tds = get_stats_player(passing_stats, getattr(passing_leader, "player", ""), "TD")
-    rushing_tds = get_stats_player(rushing_stats, getattr(rushing_leader, "player", ""), "TD")
-    receiving_tds = get_stats_player(receiving_stats, getattr(receiving_leader, "player", ""), "TD")
-
-    # ----- SCHEDULE (inline for now) -----
-    # Keeping schedule inline because it combines multiple datasets dynamically
-    schedule = fetch_and_cache_schedule(configuration, year, team, rankings_map, latest_week_with_rank)
-
-    # ----- CONTEXT -----
-    context = {
-        "title": f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
-        "message": "Welcome to the Oklahoma Football Dashboard!",
-        "record": overall_record,
-        "conference_record": conf_record,
-        "next_game": next_game,
-        "latest_victory": latest_victory,
-        "passing_leader": passing_leader,
-        "rushing_leader": rushing_leader,
-        "receiving_leader": receiving_leader,
-        "passing_tds": passing_tds,
-        "rushing_tds": rushing_tds,
-        "receiving_tds": receiving_tds,
-        "schedule": schedule,
-    }
-
-    return render(request, "stats/home.html", context)
 
 
-import datetime
-from django.shortcuts import render
-import os
-from .cfb_api import (
-    get_rankings,
-    normalize_name,
-    get_stats_player,
-    get_stat_leader,
-    fetch_team_record,
-    fetch_next_game,
-    fetch_latest_victory,
-    fetch_player_stats,
-    fetch_and_cache_schedule,
-)
 # home view
 def home(request):
 
@@ -198,6 +125,27 @@ def boxscore(request):
             team_stats = team_stats[0].teams  # list of team stat entries
         if player_stats and hasattr(player_stats[0], "teams"):
             player_stats = player_stats[0].teams  # list of player stat entries
+
+        import re
+
+        # --- Human-readable stat name conversion ---
+        def prettify_stat_name(name: str) -> str:
+            """Convert camelCase or snake_case stat names into readable labels."""
+            if not name:
+                return ""
+            # Insert spaces before capital letters and replace underscores
+            name = re.sub(r"(?<!^)(?=[A-Z])", " ", name).replace("_", " ")
+            # Capitalize each word, keeping short acronyms uppercase (e.g., QB)
+            words = [w.upper() if len(w) <= 3 else w.title() for w in name.split()]
+            return " ".join(words)
+
+        # Apply to all team stat categories
+        for team in team_stats:
+            for stat in getattr(team, "stats", []):
+                cat = getattr(stat, "category", None)
+                if cat:
+                    pretty = prettify_stat_name(cat)
+                    setattr(stat, "category", pretty)
 
         # --- Debug info ---
         print("=== BOX SCORE DEBUG ===")
