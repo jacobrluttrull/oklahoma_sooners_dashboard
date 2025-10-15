@@ -1,7 +1,7 @@
 
 import datetime
 import os
-
+from django.utils import timezone
 from django.shortcuts import render
 
 from .cfb_api import (
@@ -14,6 +14,8 @@ from .cfb_api import (
     fetch_latest_victory,
     fetch_player_stats,
     fetch_and_cache_schedule,
+    get_team_logo,
+    update_teams_from_conference
 )
 
 
@@ -23,6 +25,7 @@ def home(request):
     year = 2025
     team = "Oklahoma"
     conference = "SEC"
+
 
     # ----- TEAM RECORDS -----
     overall_record, conf_record = fetch_team_record(year, team, conference)
@@ -201,7 +204,10 @@ def boxscore(request):
             "receiving_stats": receiving_stats,
             "defensive_stats": defensive_stats,
             "team_stats": team_stats,
+            "home_logo": get_team_logo(latest_game.home_team),
+            "away_logo": get_team_logo(latest_game.away_team),
         }
+
 
         return render(request, "stats/boxscore.html", context)
 

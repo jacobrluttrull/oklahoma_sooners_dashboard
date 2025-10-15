@@ -20,6 +20,9 @@
     <div class="container mt-4">
         <div class="jumbotron text-center p-5 rounded text-white" style="background: linear-gradient(45deg, #841617, #a91b1c);">
             <h1 class="display-4">{{ message }}</h1>
+            <footer>
+                Last updated: {{ last_updated|date:"F j, Y, g:i A T" }}
+            </footer>
         </div>
 
         <!-- Season Schedule -->

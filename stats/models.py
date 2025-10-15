@@ -4,7 +4,7 @@ from django.db import models
 class Team(models.Model):
     name = models.CharField(max_length=100)
     conference = models.CharField(max_length=50, blank=True)
-
+    logo_url = models.URLField(blank=True)
     def __str__(self):
         return self.name
 

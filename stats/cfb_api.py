@@ -233,6 +233,42 @@ from django.utils import timezone
 from .models import Game, Team
 import cfbd
 
+import cfbd
+import os
+from stats.models import Team
+
+def update_teams_from_conference(conference: str, year: int = 2025):
+    """Fetch and store team info including logo URLs for a conference."""
+    configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
+    with cfbd.ApiClient(configuration) as api_client:
+        teams_api = cfbd.TeamsApi(api_client)
+        teams = teams_api.get_teams(conference=conference, year=year)
+        print(teams[0].__dict__)
+        for t in teams:
+            team, created = Team.objects.get_or_create(name=t.school)
+
+            team.abbreviation = t.abbreviation
+            team.conference = t.conference
+            team.color = getattr(t, "color", None)
+            team.alternate_color = getattr(t, "alternateColor", None)
+
+            # ✅ FIX: actually extract and store the logo
+            logos = getattr(t, "logos", [])
+            if logos and len(logos) > 0:
+                # convert to HTTPS for safety
+                team.logo_url = logos[0].replace("http://", "https://")
+            else:
+                team.logo_url = ""
+
+            team.save()
+            print(f"{'Created' if created else 'Updated'}: {team.name} → {team.logo_url or 'No logo'}")
+
+
+def get_team_logo(team_name: str):
+    team = Team.objects.filter(name__iexact=team_name).first()
+    if team and team.logo_url:
+        return team.logo_url
+    return None
 def fetch_and_cache_schedule(configuration, year, team, rankings_map, latest_week_with_rank):
     """Fetch full schedule with rankings and cache it in the DB."""
     #Check cache freshness (any OU games updated in the last 24h)
@@ -338,5 +374,6 @@ def fetch_and_cache_schedule(configuration, year, team, rankings_map, latest_wee
     except Exception as e:
         print(f"⚠️ Error fetching season schedule: {e}")
         return []
+
 
 
