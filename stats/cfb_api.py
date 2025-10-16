@@ -2,10 +2,9 @@ import os
 import datetime
 import pytz
 import cfbd
-from pydantic import StrictInt, StrictStr
 from django.core.cache import cache
-from datetime import timedelta
 from django.utils import timezone
+from datetime import timedelta
 from .models import Game, Team
 
 
@@ -20,8 +19,26 @@ def get_api_client():
 
 
 # =========================
+# 🧰 NORMALIZATION
+# =========================
+
+def normalize_name(name: str) -> str:
+    """Normalize team names to improve matching between CFBD API datasets."""
+    if not name:
+        return ""
+    return (
+        name.upper()
+        .replace(".", "")
+        .replace("&", "AND")
+        .replace("-", " ")
+        .strip()
+    )
+
+
+# =========================
 # 🏈 TEAM RECORD
 # =========================
+
 def fetch_team_record(year=2025, team="Oklahoma", conference="SEC"):
     """Fetch the team's overall and conference record."""
     with get_api_client() as api_client:
@@ -42,6 +59,7 @@ def fetch_team_record(year=2025, team="Oklahoma", conference="SEC"):
 # =========================
 # 📅 NEXT GAME
 # =========================
+
 def fetch_next_game(year=2025, team="Oklahoma", rankings_map=None, latest_week_with_rank=None, oklahoma_rank=None):
     """Fetch the team's next upcoming game."""
     with get_api_client() as api_client:
@@ -58,11 +76,11 @@ def fetch_next_game(year=2025, team="Oklahoma", rankings_map=None, latest_week_w
             eastern = pytz.timezone("US/Eastern")
             local_start_date = next_g.start_date.astimezone(eastern)
 
-            opponent_team = next_g.away_team if next_g.home_team == "Oklahoma" else next_g.home_team
+            opponent_team = next_g.away_team if next_g.home_team == team else next_g.home_team
             opponent_key = normalize_name(opponent_team)
             opponent_rank = None
 
-            if rankings_map and latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
+            if rankings_map and latest_week_with_rank and opponent_key in rankings_map.get(latest_week_with_rank, {}):
                 opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
 
             return {
@@ -82,6 +100,7 @@ def fetch_next_game(year=2025, team="Oklahoma", rankings_map=None, latest_week_w
 # =========================
 # 🏆 LATEST VICTORY
 # =========================
+
 def fetch_latest_victory(year=2025, team="Oklahoma", rankings_map=None, latest_week_with_rank=None, oklahoma_rank=None):
     """Fetch details of the team's most recent victory."""
     with get_api_client() as api_client:
@@ -92,8 +111,8 @@ def fetch_latest_victory(year=2025, team="Oklahoma", rankings_map=None, latest_w
             past_games = [
                 g for g in games
                 if hasattr(g, "start_date") and g.start_date.date() < today and (
-                    (g.home_team == team and g.home_points > g.away_points) or
-                    (g.away_team == team and g.away_points > g.home_points)
+                    (g.home_team == team and g.home_points is not None and g.away_points is not None and g.home_points > g.away_points) or
+                    (g.away_team == team and g.home_points is not None and g.away_points is not None and g.away_points > g.home_points)
                 )
             ]
 
@@ -105,7 +124,7 @@ def fetch_latest_victory(year=2025, team="Oklahoma", rankings_map=None, latest_w
             opponent_key = normalize_name(opponent_team)
             opponent_rank = None
 
-            if rankings_map and latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
+            if rankings_map and latest_week_with_rank and opponent_key in rankings_map.get(latest_week_with_rank, {}):
                 opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
 
             return {
@@ -127,6 +146,7 @@ def fetch_latest_victory(year=2025, team="Oklahoma", rankings_map=None, latest_w
 # =========================
 # 📊 PLAYER STATS
 # =========================
+
 def fetch_player_stats(year=2025, team="Oklahoma"):
     """Fetch and cache player season stats for passing, rushing, and receiving."""
     cache_key_prefix = f"{team}-{year}"
@@ -160,19 +180,9 @@ def fetch_player_stats(year=2025, team="Oklahoma"):
 # =========================
 # 🧩 HELPER FUNCTIONS
 # =========================
+
 def get_rankings(rankings_api, year: int):
     """Fetch and return AP Top 25 rankings by week."""
-    def normalize_name(name: str) -> str:
-        if not name:
-            return ""
-        return (
-            name.upper()
-            .replace(".", "")
-            .replace("&", "AND")
-            .replace("-", " ")
-            .strip()
-        )
-
     all_rankings = rankings_api.get_rankings(year=year)
     rankings_map = {}
 
@@ -188,19 +198,6 @@ def get_rankings(rankings_api, year: int):
 
     latest_week_with_rank = max(rankings_map.keys()) if rankings_map else None
     return rankings_map, latest_week_with_rank
-
-
-def normalize_name(name: str) -> str:
-    """Normalize team names to improve matching between CFBD API datasets."""
-    if not name:
-        return ""
-    return (
-        name.upper()
-        .replace(".", "")
-        .replace("&", "AND")
-        .replace("-", " ")
-        .strip()
-    )
 
 
 def get_stats_player(stats_list, player_name, stat_type):
@@ -221,21 +218,9 @@ def get_stat_leader(stats_list, stat_type="YDS"):
     if not filtered_stats:
         return None
 
-    for s in filtered_stats:
-        print(f"Player: {getattr(s, 'player', 'N/A')}, Stat: {s.stat}")
-
     leader = max(filtered_stats, key=lambda s: int(s.stat))
-    print(f"Leader for {stat_type}: {getattr(leader, 'player', 'N/A')} with {leader.stat}")
     return leader
 
-from datetime import timedelta
-from django.utils import timezone
-from .models import Game, Team
-import cfbd
-
-import cfbd
-import os
-from stats.models import Team
 
 def update_teams_from_conference(conference: str, year: int = 2025):
     """Fetch and store team info including logo URLs for a conference."""
@@ -243,19 +228,17 @@ def update_teams_from_conference(conference: str, year: int = 2025):
     with cfbd.ApiClient(configuration) as api_client:
         teams_api = cfbd.TeamsApi(api_client)
         teams = teams_api.get_teams(conference=conference, year=year)
-        print(teams[0].__dict__)
         for t in teams:
             team, created = Team.objects.get_or_create(name=t.school)
 
-            team.abbreviation = t.abbreviation
-            team.conference = t.conference
+            team.abbreviation = getattr(t, 'abbreviation', None)
+            team.conference = getattr(t, 'conference', '') or ''
             team.color = getattr(t, "color", None)
             team.alternate_color = getattr(t, "alternateColor", None)
+            team.cfbd_team_id = getattr(t, 'id', None)
 
-            # ✅ FIX: actually extract and store the logo
             logos = getattr(t, "logos", [])
             if logos and len(logos) > 0:
-                # convert to HTTPS for safety
                 team.logo_url = logos[0].replace("http://", "https://")
             else:
                 team.logo_url = ""
@@ -269,9 +252,11 @@ def get_team_logo(team_name: str):
     if team and team.logo_url:
         return team.logo_url
     return None
-def fetch_and_cache_schedule(configuration, year, team, rankings_map, latest_week_with_rank):
-    """Fetch full schedule with rankings and cache it in the DB."""
-    #Check cache freshness (any OU games updated in the last 24h)
+
+
+def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
+    """Fetch full schedule with rankings and cache it in the DB idempotently."""
+    # Check cache freshness (any OU games updated in the last 24h)
     recent_games = Game.objects.filter(date__year=year)
     if recent_games.exists():
         last_update = recent_games.order_by("-last_updated").first().last_updated
@@ -280,100 +265,128 @@ def fetch_and_cache_schedule(configuration, year, team, rankings_map, latest_wee
             schedule = []
             for g in recent_games.order_by("date"):
                 opponent = g.opponent.name
-                opponent_key = opponent.upper()
+                opponent_key = normalize_name(opponent)
                 opponent_rank = None
                 is_ranked = False
-                if latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
+                if latest_week_with_rank and opponent_key in rankings_map.get(latest_week_with_rank, {}):
                     opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
                     is_ranked = True
+
+                score_str = (
+                    f"{g.oklahoma_score} - {g.opponent_score}" if g.oklahoma_score is not None and g.opponent_score is not None else "TBD"
+                )
 
                 schedule.append({
                     "date": g.date,
                     "opponent": opponent,
-                    "location": "Home" if g.home_away == "H" else "Away",
-                    "score": f"{g.oklahoma_score} - {g.opponent_score}" if g.oklahoma_score or g.opponent_score else "TBD",
+                    "location": "Home" if g.home_away == "H" else ("Neutral" if g.home_away == "N" else "Away"),
+                    "score": score_str,
                     "result": g.result,
                     "is_ranked": is_ranked,
                     "opponent_rank": opponent_rank,
                 })
             return schedule
+
     print("♻️ Fetching fresh schedule from CFBD API...")
     try:
-        with cfbd.ApiClient(configuration) as api_client:
+        with get_api_client() as api_client:
             games_api = cfbd.GamesApi(api_client)
             games = games_api.get_games(year=year, team=team)
 
-            # ✅ Clear old OU schedule before saving
-            Game.objects.filter(date__year=year).delete()
-
-            # Prepare for bulk insert
-            new_games = []
             schedule = []
 
             for g in sorted(games, key=lambda x: x.start_date):
                 if not hasattr(g, "start_date"):
                     continue  # skip incomplete data
 
-                if g.home_team == "Oklahoma":
+                # Ensure Team records exist for both sides
+                home_team_obj, _ = Team.objects.get_or_create(name=g.home_team)
+                away_team_obj, _ = Team.objects.get_or_create(name=g.away_team)
+
+                # Oklahoma-centric fields
+                if g.home_team == team:
                     opponent_name = g.away_team
                     is_home = True
-                    oklahoma_score = g.home_points or 0
-                    opponent_score = g.away_points or 0
+                    oklahoma_score = g.home_points
+                    opponent_score = g.away_points
                 else:
                     opponent_name = g.home_team
                     is_home = False
-                    oklahoma_score = g.away_points or 0
-                    opponent_score = g.home_points or 0
+                    oklahoma_score = g.away_points
+                    opponent_score = g.home_points
 
                 result = ""
                 if g.home_points is not None and g.away_points is not None:
-                    result = "W" if oklahoma_score > opponent_score else "L"
+                    result = "W" if (oklahoma_score or 0) > (opponent_score or 0) else "L"
 
                 week_num = getattr(g, "week", None)
-                opponent_key = opponent_name.upper()
+                opponent_key = normalize_name(opponent_name)
                 opponent_rank = None
                 is_ranked = False
                 if week_num in rankings_map and opponent_key in rankings_map[week_num]:
                     opponent_rank = rankings_map[week_num][opponent_key]
                     is_ranked = True
-                elif latest_week_with_rank and opponent_key in rankings_map[latest_week_with_rank]:
+                elif latest_week_with_rank and opponent_key in rankings_map.get(latest_week_with_rank, {}):
                     opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
                     is_ranked = True
 
-                # Create Team if needed
-                opponent, _ = Team.objects.get_or_create(name=opponent_name)
+                # Upsert by CFBD game id when available, otherwise by (date, home, away)
+                cfbd_id = getattr(g, 'id', None)
+                defaults = {
+                    'season': getattr(g, 'season', None),
+                    'week': getattr(g, 'week', None),
+                    'game_type': getattr(g, 'season_type', '') or '',
+                    'conference_game': bool(getattr(g, 'conference_game', False)),
+                    'neutral_site': bool(getattr(g, 'neutral_site', False)),
+                    'home_team': home_team_obj,
+                    'away_team': away_team_obj,
+                    'home_points': getattr(g, 'home_points', None),
+                    'away_points': getattr(g, 'away_points', None),
+                    'venue': getattr(g, 'venue', ''),
+                    'attendance': getattr(g, 'attendance', None),
+                    'home_away': 'H' if is_home else ('N' if bool(getattr(g, 'neutral_site', False)) else 'A'),
+                    'oklahoma_score': oklahoma_score,
+                    'opponent_score': opponent_score,
+                    'result': result,
+                }
 
-                new_games.append(
-                    Game(
-                        opponent=opponent,
-                        date=g.start_date.date(),
-                        home_away="H" if is_home else "A",
-                        oklahoma_score=oklahoma_score,
-                        opponent_score=opponent_score,
-                        result=result,
-                        venue=getattr(g, "venue", ""),
-                        attendance=getattr(g, "attendance", None),
+                if cfbd_id is not None:
+                    game, _ = Game.objects.update_or_create(
+                        cfbd_game_id=cfbd_id,
+                        defaults={
+                            'opponent': away_team_obj if is_home else home_team_obj,
+                            'date': g.start_date.date(),
+                            **defaults,
+                        }
                     )
+                else:
+                    game, _ = Game.objects.update_or_create(
+                        date=g.start_date.date(),
+                        home_team=home_team_obj,
+                        away_team=away_team_obj,
+                        defaults={
+                            'opponent': away_team_obj if is_home else home_team_obj,
+                            **defaults,
+                        }
+                    )
+
+                score_str = (
+                    f"{oklahoma_score} - {opponent_score}" if g.home_points is not None and g.away_points is not None else "TBD"
                 )
 
                 schedule.append({
                     "date": g.start_date,
                     "opponent": opponent_name,
-                    "location": "Home" if is_home else "Away",
-                    "score": f"{oklahoma_score} - {opponent_score}" if g.home_points is not None else "TBD",
+                    "location": "Home" if is_home else ("Neutral" if bool(getattr(g, 'neutral_site', False)) else "Away"),
+                    "score": score_str,
                     "result": result,
                     "is_ranked": is_ranked,
                     "opponent_rank": opponent_rank,
                 })
 
-            # ✅ Save all at once
-            Game.objects.bulk_create(new_games)
-            print(f"✅ Cached {len(new_games)} games in the database.")
+            print(f"✅ Cached/updated {len(schedule)} games in the database.")
             return schedule
 
     except Exception as e:
         print(f"⚠️ Error fetching season schedule: {e}")
         return []
-
-
-

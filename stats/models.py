@@ -2,9 +2,14 @@ from django.db import models
 
 
 class Team(models.Model):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
     conference = models.CharField(max_length=50, blank=True)
+    abbreviation = models.CharField(max_length=20, blank=True, null=True)
+    color = models.CharField(max_length=20, blank=True, null=True)
+    alternate_color = models.CharField(max_length=20, blank=True, null=True)
+    cfbd_team_id = models.BigIntegerField(blank=True, null=True, unique=True)
     logo_url = models.URLField(blank=True)
+
     def __str__(self):
         return self.name
 
@@ -22,29 +27,46 @@ class Game(models.Model):
         ('N', 'Neutral'),
     ]
 
+    # Legacy perspective fields (Oklahoma-centric)
     opponent = models.ForeignKey(Team, on_delete=models.CASCADE)
     date = models.DateField()
     home_away = models.CharField(max_length=1, choices=HOME_AWAY_CHOICES, default='H')
-    oklahoma_score = models.PositiveIntegerField()
-    opponent_score = models.PositiveIntegerField()
+    oklahoma_score = models.PositiveIntegerField(null=True, blank=True)
+    opponent_score = models.PositiveIntegerField(null=True, blank=True)
     result = models.CharField(max_length=1, choices=RESULT_CHOICES, blank=True)
     venue = models.CharField(max_length=200, blank=True)
     attendance = models.PositiveIntegerField(null=True, blank=True)
     season_record = models.CharField(max_length=20, blank=True)
     conference_record = models.CharField(max_length=20, blank=True)
 
+    # Normalized fields
+    season = models.IntegerField(blank=True, null=True)
+    week = models.IntegerField(blank=True, null=True)
+    game_type = models.CharField(max_length=30, blank=True)
+    conference_game = models.BooleanField(default=False)
+    neutral_site = models.BooleanField(default=False)
+    home_team = models.ForeignKey(Team, related_name='home_games', on_delete=models.CASCADE, null=True, blank=True)
+    away_team = models.ForeignKey(Team, related_name='away_games', on_delete=models.CASCADE, null=True, blank=True)
+    home_points = models.PositiveIntegerField(null=True, blank=True)
+    away_points = models.PositiveIntegerField(null=True, blank=True)
+    cfbd_game_id = models.BigIntegerField(blank=True, null=True, unique=True)
+
     last_updated = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        # Auto-determine result (Win or Loss only)
-        if self.oklahoma_score > self.opponent_score:
-            self.result = 'W'
+        # Auto-determine result only when scores are present
+        if self.oklahoma_score is not None and self.opponent_score is not None:
+            self.result = 'W' if self.oklahoma_score > self.opponent_score else 'L'
         else:
-            self.result = 'L'
+            # preserve blank for TBD
+            self.result = ''
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Oklahoma {self.oklahoma_score} - {self.opponent_score} {self.opponent.name} ({self.date})"
+        score_str = (
+            f"{self.oklahoma_score} - {self.opponent_score}" if self.oklahoma_score is not None and self.opponent_score is not None else "TBD"
+        )
+        return f"Oklahoma {score_str} {self.opponent.name} ({self.date})"
 
     class Meta:
         ordering = ['-date']

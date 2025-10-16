@@ -1,4 +1,3 @@
-
 import datetime
 import os
 from django.utils import timezone
@@ -15,8 +14,8 @@ from .cfb_api import (
     fetch_player_stats,
     fetch_and_cache_schedule,
     get_team_logo,
-    update_teams_from_conference
 )
+from .models import Game
 
 
 # home view
@@ -60,9 +59,16 @@ def home(request):
     rushing_tds = get_stats_player(rushing_stats, getattr(rushing_leader, "player", ""), "TD")
     receiving_tds = get_stats_player(receiving_stats, getattr(receiving_leader, "player", ""), "TD")
 
-    # ----- SCHEDULE (inline for now) -----
-    # Keeping schedule inline because it combines multiple datasets dynamically
-    schedule = fetch_and_cache_schedule(configuration, year, team, rankings_map, latest_week_with_rank)
+    # ----- SCHEDULE -----
+    schedule = fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank)
+
+    # Last updated based on most recently updated game row, fallback to now
+    last_updated = None
+    latest_game_row = Game.objects.filter(date__year=year).order_by("-last_updated").first()
+    if latest_game_row:
+        last_updated = latest_game_row.last_updated
+    else:
+        last_updated = timezone.now()
 
     # ----- CONTEXT -----
     context = {
@@ -79,6 +85,7 @@ def home(request):
         "rushing_tds": rushing_tds,
         "receiving_tds": receiving_tds,
         "schedule": schedule,
+        "last_updated": last_updated,
     }
 
     return render(request, "stats/home.html", context)
@@ -210,6 +217,3 @@ def boxscore(request):
 
 
         return render(request, "stats/boxscore.html", context)
-
-
-
