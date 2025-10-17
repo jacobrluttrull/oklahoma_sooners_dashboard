@@ -13,55 +13,55 @@
 <div class="container mt-4">
     <div class="jumbotron text-center p-5 rounded text-white" style="background: linear-gradient(45deg, #841617, #a91b1c);">
         <h1 class="display-4">{{ message }}</h1>
-        <footer>
+        <footer style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.95;">
             Last updated: {{ last_updated|date:"F j, Y, g:i A T" }}
         </footer>
     </div>
 
     <h2 class="mt-4">Season Schedule</h2>
-    <table class="table table-striped table-bordered">
-        <thead class="table-dark">
-            <tr>
-                <th>Date</th>
-                <th>Opponent</th>
-                <th>Location</th>
-                <th>Score</th>
-                <th>Result</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for game in schedule %}
-            <tr>
-                <td>{{ game.date|date:"M d, Y" }}</td>
-                <td>
-                    {{ game.opponent }}
-                    {% if game.is_ranked %}
-                        <span class="text-muted">(#{{ game.opponent_rank }})</span>
-                    {% endif %}
-                </td>
-                <td>{{ game.location }}</td>
-                <td>{{ game.score }}</td>
-                <td>{{ game.result }}</td>
-                <td>
-                    {% if game.result == "W" %}
-                        <span class="badge bg-success fs-6">WIN</span>
-                    {% elif game.result == "L" %}
-                        <span class="badge bg-danger fs-6">LOSS</span>
-                    {% else %}
-                        <span class="badge bg-secondary fs-6">TBD</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="card mb-4">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Opponent</th>
+                    <th>Location</th>
+                    <th>Score</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for game in schedule %}
+                <tr>
+                    <td style="font-weight: 500;">{{ game.date|date:"M d, Y" }}</td>
+                    <td style="font-weight: 600;">
+                        {{ game.opponent }}
+                        {% if game.is_ranked %}
+                            <span class="text-muted">(#{{ game.opponent_rank }})</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ game.location }}</td>
+                    <td style="font-weight: 500;">{{ game.score }}</td>
+                    <td>
+                        {% if game.result == "W" %}
+                            <span class="badge bg-success">WIN</span>
+                        {% elif game.result == "L" %}
+                            <span class="badge bg-danger">LOSS</span>
+                        {% else %}
+                            <span class="badge bg-secondary">TBD</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
     <div class="card mb-4">
-        <div class="card-header"><h5>Next Game</h5></div>
+        <div class="card-header"><h5 class="mb-0">Next Game</h5></div>
         <div class="card-body">
             {% if next_game %}
-                <h4>
+                <h4 style="font-weight: 700; margin-bottom: 1rem;">
                     {{ next_game.away_team }}
                     {% if next_game.away_team == "Oklahoma" and next_game.oklahoma_rank %}
                         <span class="text-muted">(#{{ next_game.oklahoma_rank }})</span>
@@ -77,23 +77,22 @@
                     {% endif %}
                 </h4>
 
-                <p><strong>Date:</strong> {{ next_game.start_date|date:"l, F j, Y" }}</p>
-                <p><strong>Time:</strong> {{ next_game.start_date|date:"g:i A T" }}</p>
+                <p style="margin-bottom: 0.5rem;"><strong>Date:</strong> {{ next_game.start_date|date:"l, F j, Y" }}</p>
+                <p style="margin-bottom: 0.5rem;"><strong>Time:</strong> {{ next_game.start_date|date:"g:i A T" }}</p>
                 {% if next_game.venue %}
-                    <p><strong>Venue:</strong> {{ next_game.venue }}</p>
+                    <p style="margin-bottom: 0;"><strong>Venue:</strong> {{ next_game.venue }}</p>
                 {% endif %}
             {% else %}
-                <p>No more scheduled games!</p>
+                <p class="text-muted mb-0">No more scheduled games!</p>
             {% endif %}
         </div>
     </div>
 
     <div class="card mb-4">
-        <div class="card-header"><h5>Latest Victory</h5></div>
+        <div class="card-header"><h5 class="mb-0">Latest Victory</h5></div>
         <div class="card-body">
-            <a href="{% url 'stats:boxscore' %}" class="btn btn-primary mt-3">View Latest Box Score</a>
             {% if latest_victory %}
-                <h4>
+                <h4 style="font-weight: 700; margin-bottom: 1rem;">
                     {% if latest_victory.home_team == "Oklahoma" %}
                         Oklahoma
                         {% if latest_victory.oklahoma_rank %}
@@ -105,41 +104,44 @@
                             <span class="text-muted">(#{{ latest_victory.opponent_rank }})</span>
                         {% endif %}
                     {% else %}
-                        {{ latest_victory.away_team }}
-                        {% if latest_victory.opponent_rank %}
-                            <span class="text-muted">(#{{ latest_victory.opponent_rank }})</span>
-                        {% endif %}
-                        {{ latest_victory.away_points }} - {{ latest_victory.home_points }}
                         Oklahoma
                         {% if latest_victory.oklahoma_rank %}
                             <span class="text-muted">(#{{ latest_victory.oklahoma_rank }})</span>
                         {% endif %}
+                        {{ latest_victory.away_points }} - {{ latest_victory.home_points }}
+                        {{ latest_victory.away_team }}
+                        {% if latest_victory.opponent_rank %}
+                            <span class="text-muted">(#{{ latest_victory.opponent_rank }})</span>
+                        {% endif %}
                     {% endif %}
                 </h4>
-                <p><strong>Date:</strong> {{ latest_victory.start_date|date:"F j, Y" }}</p>
+                <p style="margin-bottom: 0.5rem;"><strong>Date:</strong> {{ latest_victory.start_date|date:"F j, Y" }}</p>
                 {% if latest_victory.venue %}
-                    <p><strong>Venue:</strong> {{ latest_victory.venue }}</p>
+                    <p style="margin-bottom: 0.5rem;"><strong>Venue:</strong> {{ latest_victory.venue }}</p>
                 {% endif %}
                 {% if latest_victory.attendance %}
-                    <p><strong>Attendance:</strong> {{ latest_victory.attendance|floatformat:0 }}</p>
+                    <p style="margin-bottom: 1rem;"><strong>Attendance:</strong> {{ latest_victory.attendance|floatformat:0 }}</p>
                 {% endif %}
-                <span class="badge bg-success fs-6">VICTORY</span>
+                <div style="margin-top: 1rem;">
+                    <span class="badge bg-success">VICTORY</span>
+                </div>
+                <a href="{% url 'stats:boxscore' %}" class="btn btn-primary mt-3">View Latest Box Score</a>
             {% else %}
-                <p class="text-muted">No victories to display yet!</p>
+                <p class="text-muted mb-0">No victories to display yet!</p>
             {% endif %}
         </div>
     </div>
 
     <div class="card mt-4 mb-5">
         <div class="card-header">
-            <h5>2025 Sooners Offensive Leaders</h5>
+            <h5 class="mb-0">2025 Sooners Offensive Leaders</h5>
         </div>
-        <div class="card-body">
-            <ul class="list-group">
+        <div class="card-body" style="padding: 0;">
+            <ul class="list-group list-group-flush">
                 <li class="list-group-item">
                     <strong>Passing:</strong>
                     {% if passing_leader %}
-                        {{ passing_leader.player }} – {{ passing_leader.stat }} yards, {{ passing_tds.stat }} TDs
+                        {{ passing_leader.player }} – {{ passing_leader.stat }} yards, {{ passing_tds.stat }} TDs, {{ passing_leader_interceptions.stat}} INTs
                     {% else %}
                         N/A
                     {% endif %}

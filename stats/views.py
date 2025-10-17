@@ -49,6 +49,7 @@ def home(request):
     passing_stats, rushing_stats, receiving_stats = fetch_player_stats(year, team)
 
     passing_leader = get_stat_leader(passing_stats, stat_type="YDS")
+    passing_leader_interceptions = get_stat_leader(passing_stats, stat_type="INT")
     rushing_leader = get_stat_leader(rushing_stats, stat_type="YDS")
     receiving_leader = get_stat_leader(receiving_stats, stat_type="YDS")
 
@@ -76,6 +77,7 @@ def home(request):
         "next_game": next_game,
         "latest_victory": latest_victory,
         "passing_leader": passing_leader,
+        "passing_leader_interceptions": passing_leader_interceptions,
         "rushing_leader": rushing_leader,
         "receiving_leader": receiving_leader,
         "passing_tds": passing_tds,
