@@ -5,7 +5,7 @@ import cfbd
 from django.core.cache import cache
 from django.utils import timezone
 from datetime import timedelta
-from .models import Game, Team
+from .models import Game, Team, Player
 
 
 # =========================
@@ -390,3 +390,57 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
     except Exception as e:
         print(f"⚠️ Error fetching season schedule: {e}")
         return []
+def sync_game_stats(game_id: int, year: int):
+    """Fetch team/player stats from CFBD API and store them in TeamStat and PlayerStat models."""
+    import cfbd, os
+    from .models import Game, TeamStat, PlayerStat, Team, Player
+
+    configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
+    with cfbd.ApiClient(configuration) as api_client:
+        games_api = cfbd.GamesApi(api_client)
+
+        # Fetch stats
+        game_stats = games_api.get_game_team_stats(id=game_id)
+        player_stats = games_api.get_game_player_stats(id=game_id)
+
+        try:
+            game_obj = Game.objects.get(cfbd_game_id=game_id)
+        except Game.DoesNotExist:
+            print(f" Game with CFBD ID {game_id} does not exist in the database.")
+            return
+
+        # TEAM STATS
+        if game_stats and hasattr(game_stats[0], "teams"):
+            for team_entry in game_stats[0].teams:
+                team_obj, _ = Team.objects.get_or_create(name=team_entry.team)
+                for stat in team_entry.stats:
+                    TeamStat.objects.update_or_create(
+                        game=game_obj,
+                        team=team_obj,
+                        category=stat.category,
+                        defaults={'stat': stat.stat}
+                    )
+
+        # PLAYER STATS
+        if player_stats and hasattr(player_stats[0], "teams"):
+            for team_entry in player_stats[0].teams:
+                team_obj, _ = Team.objects.get_or_create(name=team_entry.team)
+                for category in team_entry.categories:
+                    for stat_type in category.types:
+                        for athlete in stat_type.athletes:
+                            player_obj, _ = Player.objects.get_or_create(
+                                team=team_obj,
+                                name=athlete.name,
+                                defaults={'cfbd_player_id': getattr(athlete, 'id', None)},
+                            )
+                            PlayerStat.objects.update_or_create(
+                                game=game_obj,
+                                player=player_obj,
+                                category=category.name,
+                                stat_type=stat_type.name,
+                                defaults={'stat': athlete.stat},
+                            )
+
+        print(f" Game stats synchronized successfully for {game_obj}")
+
+

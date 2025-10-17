@@ -18,7 +18,6 @@ class Game(models.Model):
     RESULT_CHOICES = [
         ('W', 'Win'),
         ('L', 'Loss'),
-        # Removed ('T', 'Tie') since college football doesn't have ties
     ]
 
     HOME_AWAY_CHOICES = [
@@ -27,7 +26,6 @@ class Game(models.Model):
         ('N', 'Neutral'),
     ]
 
-    # Legacy perspective fields (Oklahoma-centric)
     opponent = models.ForeignKey(Team, on_delete=models.CASCADE)
     date = models.DateField()
     home_away = models.CharField(max_length=1, choices=HOME_AWAY_CHOICES, default='H')
@@ -45,28 +43,73 @@ class Game(models.Model):
     game_type = models.CharField(max_length=30, blank=True)
     conference_game = models.BooleanField(default=False)
     neutral_site = models.BooleanField(default=False)
-    home_team = models.ForeignKey(Team, related_name='home_games', on_delete=models.CASCADE, null=True, blank=True)
-    away_team = models.ForeignKey(Team, related_name='away_games', on_delete=models.CASCADE, null=True, blank=True)
+    home_team = models.ForeignKey(
+        Team, related_name='home_games', on_delete=models.CASCADE, null=True, blank=True
+    )
+    away_team = models.ForeignKey(
+        Team, related_name='away_games', on_delete=models.CASCADE, null=True, blank=True
+    )
     home_points = models.PositiveIntegerField(null=True, blank=True)
     away_points = models.PositiveIntegerField(null=True, blank=True)
     cfbd_game_id = models.BigIntegerField(blank=True, null=True, unique=True)
-
     last_updated = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        # Auto-determine result only when scores are present
         if self.oklahoma_score is not None and self.opponent_score is not None:
             self.result = 'W' if self.oklahoma_score > self.opponent_score else 'L'
         else:
-            # preserve blank for TBD
             self.result = ''
         super().save(*args, **kwargs)
 
     def __str__(self):
         score_str = (
-            f"{self.oklahoma_score} - {self.opponent_score}" if self.oklahoma_score is not None and self.opponent_score is not None else "TBD"
+            f"{self.oklahoma_score} - {self.opponent_score}"
+            if self.oklahoma_score is not None and self.opponent_score is not None
+            else "TBD"
         )
         return f"Oklahoma {score_str} {self.opponent.name} ({self.date})"
 
     class Meta:
         ordering = ['-date']
+
+
+# ============================================================
+# 💡 Step 5: Relational Models (Player, TeamStat, PlayerStat)
+# ============================================================
+
+class Player(models.Model):
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="players")
+    name = models.CharField(max_length=100)
+    position = models.CharField(max_length=20, blank=True)
+    jersey_number = models.PositiveIntegerField(null=True, blank=True)
+    cfbd_player_id = models.BigIntegerField(blank=True, null=True, unique=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.team.name})"
+
+
+class TeamStat(models.Model):
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="team_stats")
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name="team_stats")
+    category = models.CharField(max_length=100)
+    stat = models.CharField(max_length=100)
+
+    class Meta:
+        unique_together = ("game", "team", "category")
+
+    def __str__(self):
+        return f"{self.team.name} – {self.category}: {self.stat}"
+
+
+class PlayerStat(models.Model):
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="player_stats")
+    player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name="stats")
+    category = models.CharField(max_length=100)
+    stat_type = models.CharField(max_length=50)
+    stat = models.CharField(max_length=50)
+
+    class Meta:
+        unique_together = ("game", "player", "category", "stat_type")
+
+    def __str__(self):
+        return f"{self.player.name} – {self.category}/{self.stat_type}: {self.stat}"
