@@ -1,7 +1,6 @@
-import datetime
 import os
+
 from django.utils import timezone
-from django.shortcuts import render
 
 from .cfb_api import (
     get_rankings,
@@ -13,9 +12,7 @@ from .cfb_api import (
     fetch_latest_victory,
     fetch_player_stats,
     fetch_and_cache_schedule,
-    get_team_logo,
 )
-from .models import Game
 
 
 # home view
@@ -63,7 +60,7 @@ def home(request):
     schedule = fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank)
 
     # Last updated based on most recently updated game row, fallback to now
-    last_updated = None
+
     latest_game_row = Game.objects.filter(date__year=year).order_by("-last_updated").first()
     if latest_game_row:
         last_updated = latest_game_row.last_updated
@@ -91,129 +88,86 @@ def home(request):
     return render(request, "stats/home.html", context)
 
 
+import datetime
+from django.shortcuts import render
+from .models import Game, TeamStat, PlayerStat
+from .cfb_api import sync_game_stats, get_team_logo
+from .cfb_api import prettify_stat_name
+
+
 def boxscore(request):
-    """Displays box score for the most recent completed game."""
-
-    import cfbd
-    configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
-    with cfbd.ApiClient(configuration) as api_client:
-        games_api = cfbd.GamesApi(api_client)
-        team = "Oklahoma"
-        year = 2025
-        today = datetime.date.today()
-
-        # --- Find most recent completed game ---
-        games = games_api.get_games(year=year, team=team)
-        completed = [
-            g for g in games
-            if hasattr(g, "start_date") and g.start_date.date() < today
-            and g.home_points is not None and g.away_points is not None
-        ]
-
-        if not completed:
-            return render(request, "stats/boxscore.html", {
-                "title": "No Games Available",
-                "message": "No completed games found for this season."
-            })
-
-        latest_game = sorted(completed, key=lambda g: g.start_date, reverse=True)[0]
-        opponent = latest_game.away_team if latest_game.home_team == team else latest_game.home_team
-
-        # --- Fetch stats using id instead of week ---
-        try:
-            player_stats = games_api.get_game_player_stats(id=latest_game.id)
-            team_stats = games_api.get_game_team_stats(id=latest_game.id)
-        except Exception as e:
-            print(f"Error fetching game stats: {e}")
-            return render(request, "stats/boxscore.html", {
-                "title": "Error",
-                "message": "Unable to retrieve game stats right now."
-            })
-
-        # --- Unpack nested objects ---
-        if team_stats and hasattr(team_stats[0], "teams"):
-            team_stats = team_stats[0].teams  # list of team stat entries
-        if player_stats and hasattr(player_stats[0], "teams"):
-            player_stats = player_stats[0].teams  # list of player stat entries
-
-        import re
-
-        # --- Human-readable stat name conversion ---
-        def prettify_stat_name(name: str) -> str:
-            """Convert camelCase or snake_case stat names into readable labels."""
-            if not name:
-                return ""
-            # Insert spaces before capital letters and replace underscores
-            name = re.sub(r"(?<!^)(?=[A-Z])", " ", name).replace("_", " ")
-            # Capitalize each word, keeping short acronyms uppercase (e.g., QB)
-            words = [w.upper() if len(w) <= 3 else w.title() for w in name.split()]
-            return " ".join(words)
-
-        # Apply to all team stat categories
-        for team in team_stats:
-            for stat in getattr(team, "stats", []):
-                cat = getattr(stat, "category", None)
-                if cat:
-                    pretty = prettify_stat_name(cat)
-                    setattr(stat, "category", pretty)
-
-        # --- Debug info ---
-        print("=== BOX SCORE DEBUG ===")
-        print(f"Latest game: {latest_game.away_team} @ {latest_game.home_team}")
-        print(f"Game ID: {getattr(latest_game, 'id', 'N/A')} | Year: {year}")
-        print(f"Team entries: {len(team_stats) if team_stats else 0}")
-        print(f"Player team entries: {len(player_stats) if player_stats else 0}")
-
-        if team_stats:
-            print("First team sample:", team_stats[0].to_dict())
-        if player_stats:
-            print("First player team sample:", player_stats[0].to_dict())
-
-        # --- Flatten player stats ---
-        passing_stats, rushing_stats, receiving_stats, defensive_stats = [], [], [], []
-
-        def classify(stat_type: str) -> str:
-            st = (stat_type or "").lower()
-            if "rec" in st:
-                return "receiving"
-            if "rush" in st:
-                return "rushing"
-            if "pass" in st:
-                return "passing"
-            if any(x in st for x in ["tackle", "sack", "tfl", "int", "ff", "fr", "qb_hurry", "deflect", "pd"]):
-                return "defensive"
-            return "other"
-
-        # Loop deeper: team -> players -> stats
-        for team_entry in player_stats:
-            for player in getattr(team_entry, "players", []):
-                for s in getattr(player, "stats", []):
-                    bucket = classify(getattr(s, "stat_type", getattr(s, "statType", "")))
-                    row = {
-                        "player": getattr(player, "name", "Unknown"),
-                        "stat_type": getattr(s, "stat_type", getattr(s, "statType", "")),
-                        "stat": getattr(s, "stat", getattr(s, "value", "")),
-                    }
-                    if bucket == "passing":
-                        passing_stats.append(row)
-                    elif bucket == "rushing":
-                        rushing_stats.append(row)
-                    elif bucket == "receiving":
-                        receiving_stats.append(row)
-                    elif bucket == "defensive":
-                        defensive_stats.append(row)
-
-        context = {
-            "latest_game": latest_game,
-            "opponent": opponent,
-            "passing_stats": passing_stats,
-            "rushing_stats": rushing_stats,
-            "receiving_stats": receiving_stats,
-            "defensive_stats": defensive_stats,
-            "team_stats": team_stats,
-            "home_logo": get_team_logo(latest_game.home_team),
-            "away_logo": get_team_logo(latest_game.away_team),
-        }
+    """Displays box score for the most recent completed game from the database (syncs if needed)."""
 
 
-        return render(request, "stats/boxscore.html", context)
+    year = 2025
+    today = datetime.date.today()
+
+    # --- Get most recent completed game ---
+    latest_game = (
+        Game.objects.filter(
+            season=year,
+            home_points__isnull=False,
+            away_points__isnull=False,
+            date__lt=today,
+        )
+        .order_by("-date")
+        .first()
+    )
+
+    if not latest_game:
+        return render(
+            request,
+            "stats/boxscore.html",
+            {"title": "No Games Available", "message": "No completed games found."},
+        )
+
+    # --- If no stats cached yet, pull from API once ---
+    if not TeamStat.objects.filter(game=latest_game).exists() or not PlayerStat.objects.filter(game=latest_game).exists():
+        print(f"📡 Syncing stats for {latest_game.cfbd_game_id}...")
+        sync_game_stats(latest_game.cfbd_game_id)
+
+    # --- Fetch from DB ---
+    team_stats = TeamStat.objects.filter(game=latest_game)
+    # Prettify team stat category labels for display (do not persist to DB)
+    for ts in team_stats:
+        ts.category = prettify_stat_name(ts.category)
+    team_names = team_stats.values_list("team__name", flat=True).distinct()
+    player_stats_qs = PlayerStat.objects.filter(game=latest_game).select_related('player', 'player__team')
+
+    # Build nested structure: [{team: name, categories: [{name, types: [{name, athletes:[{name,stat}]}]}]}]
+    from collections import OrderedDict
+    teams_map = OrderedDict()
+    for ps in player_stats_qs:
+        team_name = ps.player.team.name if ps.player and ps.player.team else 'Unknown'
+        team_entry = teams_map.setdefault(team_name, OrderedDict())
+        cat_entry = team_entry.setdefault(ps.category or 'General', OrderedDict())
+        type_list = cat_entry.setdefault(ps.stat_type or 'Value', [])
+        type_list.append(ps)
+
+    player_stats = []
+    for team_name, categories in teams_map.items():
+        team_obj = {'team': team_name, 'categories': []}
+        for cat, types_dict in categories.items():
+            cat_obj = {'name': prettify_stat_name(cat), 'types': []}
+            # types_dict is {stat_type: [PlayerStat,...]} but our grouping used lists per stat_type key
+            # However above we appended ps objects into a list keyed by stat_type via setdefault; need to regroup by stat_type
+            # types_dict currently is OrderedDict where keys are stat_type and values are lists of PlayerStat
+            for stat_type_name, stats_list in types_dict.items():
+                type_obj = {
+                    'name': prettify_stat_name(stat_type_name),
+                    'athletes': [{'name': s.player.name if s.player else '', 'stat': s.stat} for s in stats_list]
+                }
+                cat_obj['types'].append(type_obj)
+            team_obj['categories'].append(cat_obj)
+        player_stats.append(team_obj)
+
+    context = {
+        "latest_game": latest_game,
+        "team_stats": team_stats,
+        "team_names": team_names,
+        "player_stats": player_stats,
+         "home_logo": get_team_logo(latest_game.home_team.name if latest_game.home_team else None),
+         "away_logo": get_team_logo(latest_game.away_team.name if latest_game.away_team else None),
+     }
+
+    return render(request, "stats/boxscore.html", context)

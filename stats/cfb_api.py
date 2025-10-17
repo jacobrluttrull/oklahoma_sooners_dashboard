@@ -1,15 +1,19 @@
-import os
 import datetime
-import pytz
+import os
+from datetime import timedelta
+import re
+
 import cfbd
+import pytz
 from django.core.cache import cache
 from django.utils import timezone
-from datetime import timedelta
-from .models import Game, Team, Player
+from django.db.models import Q
+
+from .models import Game, Team, TeamStat, PlayerStat, Player
 
 
 # =========================
-# 🔐 CFBD CONFIGURATION
+# CFBD CONFIGURATION
 # =========================
 def get_api_client():
     configuration = cfbd.Configuration(
@@ -19,7 +23,7 @@ def get_api_client():
 
 
 # =========================
-# 🧰 NORMALIZATION
+# NORMALIZATION
 # =========================
 
 def normalize_name(name: str) -> str:
@@ -35,8 +39,96 @@ def normalize_name(name: str) -> str:
     )
 
 
+def prettify_stat_name(name: str) -> str:
+    """
+    Convert CFBD-style stat names into human-readable labels.
+    Approach:
+      - Tokenize the input into words/acronyms/numbers (handles camelCase, snake_case, ALLCAPS)
+      - Map common abbreviations per-token (case-insensitive)
+      - Join tokens with spaces and title-case where appropriate, preserving known acronyms (e.g., 'QB')
+    """
+    if not name:
+        return ""
+
+    s = name.strip()
+    # Normalize separators
+    s = s.replace('_', ' ').replace('-', ' ')
+
+    # Tokenize: capture sequences like XML, Http, 3rd, numbers
+    token_pattern = r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+"
+    raw_tokens = re.findall(token_pattern, s)
+    if not raw_tokens:
+        raw_tokens = re.split(r"\s+", s)
+
+    # mapping of common abbreviations -> full form (lowercase keys)
+    token_map = {
+        'qbr': 'QB Rating',
+        'qb': 'QB',
+        'td': 'Touchdown',
+        'tds': 'Touchdowns',
+        'int': 'Interception',
+        'ints': 'Interceptions',
+        'eff': 'Efficiency',
+        'yds': 'Yards',
+        'pct': 'Percentage',
+        'avg': 'Average',
+        'att': 'Attempts',
+        'cmp': 'Completions',
+        'comp': 'Completions',
+        'fum': 'Fumbles',
+        'sack': 'Sack',
+        'sacks': 'Sacks',
+        'fg': 'Field Goal',
+        'fgm': 'Field Goals',
+        'pd': 'Passes Defended',
+        'tfl': 'Tackles For Loss',
+        'tot': 'Total',
+        'hur': 'Hurries',
+        'hurr': 'Hurries',
+        'hurries': 'Hurries',
+        'attmpts': 'Attempts',
+    }
+
+    out_tokens = []
+    i = 0
+    L = len(raw_tokens)
+    # Try to combine up to 3 tokens to match token_map keys (fixes splits like ['T','Ds'] -> 'tds')
+    while i < L:
+        matched = False
+        # Look ahead up to 3 tokens
+        for n in (3, 2, 1):
+            if i + n <= L:
+                candidate = ''.join(raw_tokens[i:i+n])
+                # normalize candidate by removing non-alphanumeric characters
+                candidate_norm = ''.join(re.sub(r'[^A-Za-z0-9]', '', c) for c in raw_tokens[i:i+n])
+                key = candidate_norm.lower()
+                if key in token_map:
+                    out_tokens.append(token_map[key])
+                    i += n
+                    matched = True
+                    break
+        if matched:
+            continue
+
+        t = raw_tokens[i]
+        key = t.lower()
+        if key in token_map:
+            out_tokens.append(token_map[key])
+        elif t.isupper():
+            # Preserve acronyms like QB, FG
+            out_tokens.append(t)
+        else:
+            out_tokens.append(t.capitalize())
+        i += 1
+
+    pretty = ' '.join(out_tokens)
+    # final cleanup: replace multiple spaces
+    pretty = re.sub(r'\s+', ' ', pretty).strip()
+    return pretty
+
+
 # =========================
-# 🏈 TEAM RECORD
+# TEAM RECORD
 # =========================
 
 def fetch_team_record(year=2025, team="Oklahoma", conference="SEC"):
@@ -57,7 +149,7 @@ def fetch_team_record(year=2025, team="Oklahoma", conference="SEC"):
 
 
 # =========================
-# 📅 NEXT GAME
+# NEXT GAME
 # =========================
 
 def fetch_next_game(year=2025, team="Oklahoma", rankings_map=None, latest_week_with_rank=None, oklahoma_rank=None):
@@ -98,7 +190,7 @@ def fetch_next_game(year=2025, team="Oklahoma", rankings_map=None, latest_week_w
 
 
 # =========================
-# 🏆 LATEST VICTORY
+# LATEST VICTORY
 # =========================
 
 def fetch_latest_victory(year=2025, team="Oklahoma", rankings_map=None, latest_week_with_rank=None, oklahoma_rank=None):
@@ -144,7 +236,7 @@ def fetch_latest_victory(year=2025, team="Oklahoma", rankings_map=None, latest_w
 
 
 # =========================
-# 📊 PLAYER STATS
+# PLAYER STATS
 # =========================
 
 def fetch_player_stats(year=2025, team="Oklahoma"):
@@ -178,7 +270,7 @@ def fetch_player_stats(year=2025, team="Oklahoma"):
 
 
 # =========================
-# 🧩 HELPER FUNCTIONS
+# HELPER FUNCTIONS
 # =========================
 
 def get_rankings(rankings_api, year: int):
@@ -255,13 +347,43 @@ def get_team_logo(team_name: str):
 
 
 def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
-    """Fetch full schedule with rankings and cache it in the DB idempotently."""
-    # Check cache freshness (any OU games updated in the last 24h)
-    recent_games = Game.objects.filter(date__year=year)
+    """
+    Fetch full schedule for a team and cache it in the DB idempotently.
+    Will skip re-fetching if last update < 24 hours ago.
+
+    `team` may be a Team instance, a team name/abbreviation string, or a numeric CFBD team id.
+    """
+
+    # Resolve the `team` argument to a Team DB object when possible to filter by FK.
+    team_obj = None
+    try:
+        # If user passed an integer or numeric string, try to match cfbd_team_id
+        if isinstance(team, int) or (isinstance(team, str) and team.isdigit()):
+            team_id = int(team)
+            team_obj = Team.objects.filter(cfbd_team_id=team_id).first()
+    except Exception:
+        team_obj = None
+
+    if not team_obj and isinstance(team, str):
+        # Try matching by name or abbreviation (case-insensitive)
+        team_obj = Team.objects.filter(name__iexact=team).first() or Team.objects.filter(abbreviation__iexact=team).first()
+
+    # --- Check cache freshness (games for the requested team updated in the last 24h) ---
+    if team_obj:
+        recent_games = Game.objects.filter(date__year=year).filter(
+            Q(home_team=team_obj) | Q(away_team=team_obj)
+        )
+    else:
+        # Fallback to name-based filtering if we couldn't resolve a Team object
+        recent_games = Game.objects.filter(date__year=year).filter(
+            Q(home_team__name__iexact=team) | Q(away_team__name__iexact=team)
+        )
+
     if recent_games.exists():
         last_update = recent_games.order_by("-last_updated").first().last_updated
         if (timezone.now() - last_update) < timedelta(days=1):
-            print("✅ Using cached schedule from database")
+            print("Using cached schedule from database")
+
             schedule = []
             for g in recent_games.order_by("date"):
                 opponent = g.opponent.name
@@ -273,7 +395,9 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     is_ranked = True
 
                 score_str = (
-                    f"{g.oklahoma_score} - {g.opponent_score}" if g.oklahoma_score is not None and g.opponent_score is not None else "TBD"
+                    f"{g.oklahoma_score} - {g.opponent_score}"
+                    if g.oklahoma_score is not None and g.opponent_score is not None
+                    else "TBD"
                 )
 
                 schedule.append({
@@ -287,24 +411,33 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                 })
             return schedule
 
-    print("♻️ Fetching fresh schedule from CFBD API...")
+    # --- Otherwise, fetch fresh data ---
+    print("Fetching fresh schedule from CFBD API...")
+
     try:
         with get_api_client() as api_client:
             games_api = cfbd.GamesApi(api_client)
             games = games_api.get_games(year=year, team=team)
 
+            seen = set()  # prevent duplicates
             schedule = []
 
-            for g in sorted(games, key=lambda x: x.start_date):
+            for g in sorted(games, key=lambda x: getattr(x, "start_date", None) or timezone.now()):
                 if not hasattr(g, "start_date"):
                     continue  # skip incomplete data
+
+                # Create a unique key to skip duplicates (e.g., duplicate game_id or postseason variant)
+                key = (g.start_date.date(), g.home_team, g.away_team)
+                if key in seen:
+                    continue
+                seen.add(key)
 
                 # Ensure Team records exist for both sides
                 home_team_obj, _ = Team.objects.get_or_create(name=g.home_team)
                 away_team_obj, _ = Team.objects.get_or_create(name=g.away_team)
 
                 # Oklahoma-centric fields
-                if g.home_team == team:
+                if g.home_team == team or (team_obj and home_team_obj == team_obj):
                     opponent_name = g.away_team
                     is_home = True
                     oklahoma_score = g.home_points
@@ -315,10 +448,12 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     oklahoma_score = g.away_points
                     opponent_score = g.home_points
 
+                # Determine W/L result
                 result = ""
                 if g.home_points is not None and g.away_points is not None:
                     result = "W" if (oklahoma_score or 0) > (opponent_score or 0) else "L"
 
+                # Determine ranking info
                 week_num = getattr(g, "week", None)
                 opponent_key = normalize_name(opponent_name)
                 opponent_rank = None
@@ -330,8 +465,7 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
                     is_ranked = True
 
-                # Upsert by CFBD game id when available, otherwise by (date, home, away)
-                cfbd_id = getattr(g, 'id', None)
+                cfbd_id = getattr(g, "id", None)
                 defaults = {
                     'season': getattr(g, 'season', None),
                     'week': getattr(g, 'week', None),
@@ -348,30 +482,22 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     'oklahoma_score': oklahoma_score,
                     'opponent_score': opponent_score,
                     'result': result,
+                    'opponent': away_team_obj if is_home else home_team_obj,
+                    'date': g.start_date.date(),
                 }
 
-                if cfbd_id is not None:
-                    game, _ = Game.objects.update_or_create(
-                        cfbd_game_id=cfbd_id,
-                        defaults={
-                            'opponent': away_team_obj if is_home else home_team_obj,
-                            'date': g.start_date.date(),
-                            **defaults,
-                        }
-                    )
-                else:
-                    game, _ = Game.objects.update_or_create(
-                        date=g.start_date.date(),
-                        home_team=home_team_obj,
-                        away_team=away_team_obj,
-                        defaults={
-                            'opponent': away_team_obj if is_home else home_team_obj,
-                            **defaults,
-                        }
-                    )
+                lookup = {'cfbd_game_id': cfbd_id} if cfbd_id else {
+                    'date': g.start_date.date(),
+                    'home_team': home_team_obj,
+                    'away_team': away_team_obj,
+                }
+
+                game, _ = Game.objects.update_or_create(defaults=defaults, **lookup)
 
                 score_str = (
-                    f"{oklahoma_score} - {opponent_score}" if g.home_points is not None and g.away_points is not None else "TBD"
+                    f"{oklahoma_score} - {opponent_score}"
+                    if g.home_points is not None and g.away_points is not None
+                    else "TBD"
                 )
 
                 schedule.append({
@@ -384,17 +510,15 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     "opponent_rank": opponent_rank,
                 })
 
-            print(f"✅ Cached/updated {len(schedule)} games in the database.")
+            print(f"Cached/updated {len(schedule)} games in the database (deduplicated).")
             return schedule
 
     except Exception as e:
-        print(f"⚠️ Error fetching season schedule: {e}")
+        print(f"Error fetching season schedule: {e}")
         return []
-def sync_game_stats(game_id: int, year: int):
-    """Fetch team/player stats from CFBD API and store them in TeamStat and PlayerStat models."""
-    import cfbd, os
-    from .models import Game, TeamStat, PlayerStat, Team, Player
 
+def sync_game_stats(game_id: int):
+    """Fetch team/player stats from CFBD API and store them in TeamStat and PlayerStat models."""
     configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
     with cfbd.ApiClient(configuration) as api_client:
         games_api = cfbd.GamesApi(api_client)
@@ -406,7 +530,7 @@ def sync_game_stats(game_id: int, year: int):
         try:
             game_obj = Game.objects.get(cfbd_game_id=game_id)
         except Game.DoesNotExist:
-            print(f" Game with CFBD ID {game_id} does not exist in the database.")
+            print(f"Game with CFBD ID {game_id} does not exist in the database.")
             return
 
         # TEAM STATS
@@ -417,7 +541,7 @@ def sync_game_stats(game_id: int, year: int):
                     TeamStat.objects.update_or_create(
                         game=game_obj,
                         team=team_obj,
-                        category=stat.category,
+                        category=prettify_stat_name(stat.category),
                         defaults={'stat': stat.stat}
                     )
 
@@ -441,6 +565,4 @@ def sync_game_stats(game_id: int, year: int):
                                 defaults={'stat': athlete.stat},
                             )
 
-        print(f" Game stats synchronized successfully for {game_obj}")
-
-
+        print(f"Game stats synchronized successfully for {game_obj}")

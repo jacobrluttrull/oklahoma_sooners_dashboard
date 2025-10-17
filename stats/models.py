@@ -71,6 +71,7 @@ class Game(models.Model):
 
     class Meta:
         ordering = ['-date']
+        unique_together = (('date', 'home_team', 'away_team'),)
 
 
 # ============================================================
