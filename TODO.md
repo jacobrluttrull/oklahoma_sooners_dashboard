@@ -1,120 +1,113 @@
-# Oklahoma Sooners Dashboard — TODO List
+# Project Context & Next Steps
 
-This document outlines planned enhancements, polish tasks, and next-phase features for the Oklahoma Sooners Dashboard project.  
-These updates build upon the current implementation (live stats, caching, and schedule display) and aim to expand data depth, improve visuals, and prepare the site for long-term scalability.
+## Overview
+This file documents the review performed, issues discovered in templates, a recommended SQLite schema to capture teams, games, players and stats, and a concise implementation plan to build relationships and populate data.
 
----
+## What was reviewed
+- Templates: `templates/stats/boxscore.html` (scoped UI and loop logic).
+- Project intent: store teams, games, players, logos, and both team and player stats in SQLite using primary/foreign keys.
+- Repository: local workspace.
 
-## Core Upcoming Tasks
+## Key issues found (brief)
+- In `boxscore.html` the `team.stats` loop needed to render each stat inside the loop — the template currently already does this correctly in the provided attachment. Keep the loop and ensure view data matches the structure.
+- Validate that `player_stats` is always an iterable or that templates guard against `None` to avoid template errors.
+- Template data shape requires structured view context: `latest_game`, `team_stats`, `player_stats`, `home_logo`, `away_logo`. Views must assemble these from the DB.
+- There was no explicit schema in the repository for player/team/game relationships; a normalized schema is recommended to avoid duplicate data and make joins easier.
 
-1. Box Score for Latest Victory  
-Goal: Display a detailed box score (passing, rushing, receiving leaders) for the most recent win.  
-Implementation Plan:  
-- Use the existing `latest_victory` object to retrieve its `id` or `game_id`.  
-- Call:
-game_stats = cfbd.GamesApi(api_client).get_game_stats(game_id)
+## Suggested SQLite schema (core tables)
+Use integer primary keys, foreign keys, and simple types. Adjust names to match your ORM/models.
 
-text
-- Extract key offensive stats and show in a new section on the homepage.  
-- Consider a small table like:
+- `teams`
+  - `id INTEGER PRIMARY KEY`
+  - `name TEXT UNIQUE NOT NULL`
+  - `abbrev TEXT`
+  - `logo_path TEXT`
 
-| Player | Stat Type | Value |
+- `players`
+  - `id INTEGER PRIMARY KEY`
+  - `team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE`
+  - `first_name TEXT`
+  - `last_name TEXT`
+  - `position TEXT`
+  - `number INTEGER`
 
-2. Fix Time Formatting for Next Game  
-Goal: Display the correct local game time with time zone adjustment.  
-Implementation Plan:  
-- Use:
-next_game.start_date.astimezone(timezone.get_current_timezone())
+- `games`
+  - `id INTEGER PRIMARY KEY`
+  - `date DATE`
+  - `home_team_id INTEGER REFERENCES teams(id)`
+  - `away_team_id INTEGER REFERENCES teams(id)`
+  - `home_points INTEGER`
+  - `away_points INTEGER`
+  - `status TEXT` — e.g., FINAL, SCHEDULED
 
-text
-- Display as:
-{{ next_game.start_date|date:"l, F j, g:i A T" }}
+- `team_stat_categories`
+  - `id INTEGER PRIMARY KEY`
+  - `name TEXT UNIQUE` — e.g., "offense", "defense", "rebounding"
 
-text
-- Add logic to handle None or “TBD” game times gracefully.
+- `team_stats`
+  - `id INTEGER PRIMARY KEY`
+  - `game_id INTEGER REFERENCES games(id)`
+  - `team_id INTEGER REFERENCES teams(id)`
+  - `category_id INTEGER REFERENCES team_stat_categories(id)`
+  - `stat_key TEXT` — e.g., "points", "fga"
+  - `stat_value TEXT` — store as TEXT to allow percentages/formats
 
-3. Add Rankings for Opponents  
-Goal: Show team rankings next to opponents in both the schedule and latest victory.  
-Implementation Plan:  
-- Use:
-rankings_api = cfbd.RankingsApi(api_client)
-current_rankings = rankings_api.get_rankings(year=year)
+- `player_stat_categories`
+  - `id INTEGER PRIMARY KEY`
+  - `name TEXT` — e.g., "scoring", "rebounding"
 
-text
-- Create a mapping:
-rankings = {team.team: team.rank for poll in current_rankings for team in poll.polls.ranks}
+- `player_stats`
+  - `id INTEGER PRIMARY KEY`
+  - `game_id INTEGER REFERENCES games(id)`
+  - `player_id INTEGER REFERENCES players(id)`
+  - `category_id INTEGER REFERENCES player_stat_categories(id)`
+  - `stat_key TEXT`
+  - `stat_value TEXT`
 
-text
-- Append opponent rank to schedule entries (e.g., “Texas (7)”).  
-- Maintain a list of ranked wins for display:
-ranked_wins = [g for g in schedule if g["result"] == "W" and g["opponent_rank"] <= 25]
+## Implementation plan (step-by-step)
+1. Design models/migrations (Django models or raw SQL) matching the schema above.
+2. Run migrations/create SQLite file and enable foreign keys (`PRAGMA foreign_keys = ON;`).
+3. Create seed scripts to populate `teams`, `players`, and a few `games` with `team_stats` and `player_stats`.
+4. Build view/query that:
+   - Loads `latest_game` (or requested `game_id`).
+   - Joins `teams` for `home` and `away` and their `logo_path`s.
+   - Aggregates `team_stats` per team into a list of `{ team, stats: [ { category, stat_key, stat_value } ] }`.
+   - Aggregates `player_stats` into structure used by template: `player_stats = [ { team, categories: [ { name, types: [ { name, athletes: [ { name, stat } ] } ] } ] } ]`.
+5. Fix template issues and render view context keys: `latest_game`, `team_stats`, `player_stats`, `home_logo`, `away_logo`.
+6. Add unit tests for data assembling functions and template context.
 
-text
+## Template fixes (concise)
+- Ensure the `team.stats` loop in `templates/stats/boxscore.html` iterates and renders each stat inside the loop.
+- Ensure `player_stats` is checked for truthiness before iterating so the template safely handles empty results.
+- Validate `latest_game` presence before accessing attributes in template or provide fallback values in view context.
 
-4. Add Logo and Page Naming  
-Goal: Give the site a more polished, branded presentation.  
-Implementation Plan:  
-- Place ou_logo.png in `/static/images/`.  
-- Add to home.html header:
-<img src="{% static 'images/ou_logo.png' %}" alt="Oklahoma Sooners Logo" width="120"> <h1>Oklahoma Sooners Football Dashboard</h1> ``` - Update Django page titles dynamically with context title.
+Example pseudo-fix for the team stats section:
+- Keep:
+  - `{% for stat in team.stats %}`
+  - render each stat row inside that loop
+  - `{% endfor %}`
 
-## Additional Recommended Features
+## Queries / views guidance
+- Use ORM relations or SQL JOINs to load teams, players, and stats in as few queries as possible.
+- Prefer assembling Python structures in the view rather than complex template logic.
 
-### Ranked Wins Summary
-Goal: Track and display Oklahoma’s record against ranked opponents.  
-Implementation Plan:
-- Use the rankings data gathered above.
-- Generate:
-  - Ranked Record: 3–1
-  - Ranked Wins: Texas (7), Alabama (12), LSU (23)
+## Files to add or update
+- `models.py` or migration SQL for `teams`, `players`, `games`, `team_stats`, `player_stats`
+- `management/commands/seed_data.py` or `scripts/seed_db.py`
+- `views.py` (or function) that returns the prepared context for `boxscore.html`
+- `tests/test_stats_views.py`
 
-### Team Comparison Page
-Goal: Create a separate page comparing Oklahoma’s core team stats against other SEC teams.  
-Implementation Plan:
-- Add route /compare/.
-- Use CFBD StatsApi.get_team_season_stats() to pull offensive/defensive metrics.
-- Visualize using a table or bar chart (points per game, yards, turnovers, etc.).
+## Next immediate tasks (priority)
+1. Implement schema and run migrations.
+2. Seed sample data for one completed game.
+3. Update the view that renders `boxscore.html` to provide the exact nested data shape.
+4. Fix template loops and conditionals to match the provided context.
+5. Add unit tests for the view/data assembly.
 
-### Data Visualization
-Goal: Add charts to enhance presentation and comprehension.  
-Implementation Plan:
-- Use Chart.js or Plotly.js via CDN in templates.
-- Create visuals such as:
-  - Season points per game over time.
-  - Rushing vs. passing yard distribution.
-  - Win margin trends.
-
-### Persistent Historical Caching
-Goal: Extend cache to preserve past season data across server restarts.  
-Implementation Plan:
-- Migrate to Redis for persistent caching.
-- Cache historical data indefinitely (timeout=None).
-- Allow browsing by year with a simple dropdown or route parameter.
-
-### Theming and UI Improvements
-Goal: Improve the visual design and responsiveness.  
-Implementation Plan:
-- Apply a minimalist dark theme or team-color theme (crimson and cream).
-- Use CSS grid or Bootstrap for layout.
-- Make tables responsive on mobile devices.
-
-### Optional: API Rate Limit Handling
-Goal: Ensure smooth operation even under CFBD API constraints.  
-Implementation Plan:
-- Wrap CFBD API calls in retry logic with exponential backoff.
-- Display cached data if the API returns an error.
-
-### Quality-of-Life Enhancements
-- Add a “Last Updated” timestamp (already planned for caching transparency).
-- Add tooltips or hover info for opponent rankings and stats.
-- Include an “About” page explaining data sources and update frequency.
-- Add favicon and meta description for browser and SEO polish.
+## Notes
+- Use SQLite for development; if you later add concurrency or scale needs, migrate to PostgreSQL.
+- Keep `stat_key` and `stat_value` flexible for formatting; normalize later if needed for analytics.
 
 ---
 
-## Notes for Next Work Session
-
-- Start with Box Score for Latest Victory (foundation for deeper game detail pages).
-- Move to Opponent Rankings (pairs perfectly with schedule improvements).
-- End with visual polish (logos, title, page layout).
-- Focus on one at a time — each task is modular and builds toward a full-featured, professional sports analytics dashboard.
+Generated: Project context and recommended next steps for implementing relational models and connecting them to the boxscore template.
