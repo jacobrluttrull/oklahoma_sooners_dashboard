@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'stats',
-    'schema_viewer'
+    'schema_viewer',
 ]
 CACHES = {
     'default': {
