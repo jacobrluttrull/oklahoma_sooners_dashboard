@@ -57,6 +57,21 @@ def home(request):
     rushing_tds = get_stats_player(rushing_stats, getattr(rushing_leader, "player", ""), "TD")
     receiving_tds = get_stats_player(receiving_stats, getattr(receiving_leader, "player", ""), "TD")
 
+    # ----- EXTRA QB STATS (rushing yards, rushing TDs, combined TDs) -----
+    qb_rushing_yards = get_stats_player(rushing_stats, getattr(passing_leader, "player", ""), "YDS")
+    qb_rushing_tds = get_stats_player(rushing_stats, getattr(passing_leader, "player", ""), "TD")
+
+    # Combined TDs for QB (passing + rushing)
+    qb_combined_tds = int(getattr(passing_tds, "stat", 0)) + int(getattr(qb_rushing_tds, "stat", 0))
+
+    # ----- EXTRA RB STATS (receptions, receiving yards, receiving TDs) -----
+    rb_receptions = get_stats_player(receiving_stats, getattr(rushing_leader, "player", ""), "REC")
+    rb_receiving_yards = get_stats_player(receiving_stats, getattr(rushing_leader, "player", ""), "YDS")
+    rb_receiving_tds = get_stats_player(receiving_stats, getattr(rushing_leader, "player", ""), "TD")
+
+    # ----- EXTRA WR STATS (receptions) -----
+    wr_receptions = get_stats_player(receiving_stats, getattr(receiving_leader, "player", ""), "REC")
+
     # ----- SCHEDULE -----
     schedule = fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank)
 
@@ -83,6 +98,13 @@ def home(request):
         "passing_tds": passing_tds,
         "rushing_tds": rushing_tds,
         "receiving_tds": receiving_tds,
+        "qb_rushing_yards": qb_rushing_yards,
+        "qb_rushing_tds": qb_rushing_tds,
+        "qb_combined_tds": qb_combined_tds,
+        "rb_receptions": rb_receptions,
+        "rb_receiving_yards": rb_receiving_yards,
+        "rb_receiving_tds": rb_receiving_tds,
+        "wr_receptions": wr_receptions,
         "schedule": schedule,
         "last_updated": last_updated,
     }

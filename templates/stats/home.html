@@ -139,27 +139,66 @@
         <div class="card-body" style="padding: 0;">
             <ul class="list-group list-group-flush">
                 <li class="list-group-item">
-                    <strong>Passing:</strong>
+                    <div style="margin-bottom: 0.25rem;">
+                        <strong>Passing:</strong>
+                        {% if passing_leader %}
+                            {{ passing_leader.player }} – {{ passing_leader.stat }} yards, {{ passing_tds.stat }} TDs, {{ passing_leader_interceptions.stat }} INTs
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
                     {% if passing_leader %}
-                        {{ passing_leader.player }} – {{ passing_leader.stat }} yards, {{ passing_tds.stat }} TDs, {{ passing_leader_interceptions.stat}} INTs
-                    {% else %}
-                        N/A
+                        <div style="font-size: 0.9rem; padding-left: 1.25rem;">
+                            <span class="text-muted">Rushing:</span>
+                            <span>
+                                {% if qb_rushing_yards %}
+                                    {{ qb_rushing_yards.stat }} yards, {{ qb_rushing_tds.stat }} TDs
+                                {% else %}
+                                    0 yards, 0 TDs
+                                {% endif %}
+                            </span>
+                            <span class="text-muted">&nbsp;|&nbsp;</span>
+                            <span class="text-muted">Combined TDs:</span>
+                            <span>{{ qb_combined_tds }}</span>
+                        </div>
                     {% endif %}
                 </li>
                 <li class="list-group-item">
-                    <strong>Rushing:</strong>
+                    <div style="margin-bottom: 0.25rem;">
+                        <strong>Rushing:</strong>
+                        {% if rushing_leader %}
+                            {{ rushing_leader.player }} – {{ rushing_leader.stat }} yards, {{ rushing_tds.stat }} TDs
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
                     {% if rushing_leader %}
-                        {{ rushing_leader.player }} – {{ rushing_leader.stat }} yards, {{ rushing_tds.stat }} TDs
-                    {% else %}
-                        N/A
+                        <div style="font-size: 0.9rem; padding-left: 1.25rem;">
+                            <span class="text-muted">Receiving:</span>
+                            <span>
+                                {% if rb_receptions %}
+                                    {{ rb_receptions.stat }} rec, {{ rb_receiving_yards.stat }} yards, {{ rb_receiving_tds.stat }} TDs
+                                {% else %}
+                                    0 rec, 0 yards, 0 TDs
+                                {% endif %}
+                            </span>
+                        </div>
                     {% endif %}
                 </li>
                 <li class="list-group-item">
-                    <strong>Receiving:</strong>
-                    {% if receiving_leader %}
-                        {{ receiving_leader.player }} – {{ receiving_leader.stat }} yards, {{ receiving_tds.stat }} TDs
-                    {% else %}
-                        N/A
+                    <div style="margin-bottom: 0.25rem;">
+                        <strong>Receiving:</strong>
+                        {% if receiving_leader %}
+                            {{ receiving_leader.player }} – {{ receiving_leader.stat }} yards, {{ receiving_tds.stat }} TDs
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+                    {% if receiving_leader and wr_receptions %}
+                        <div style="font-size: 0.9rem; padding-left: 1.25rem;">
+                            <span class="text-muted">Receptions:</span>
+                            <span>{{ wr_receptions.stat }}</span>
+                        </div>
                     {% endif %}
                 </li>
             </ul>
