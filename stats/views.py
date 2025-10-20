@@ -13,6 +13,7 @@ from .cfb_api import (
     fetch_player_stats,
     fetch_and_cache_schedule,
 )
+from .next_game_prediction import GamePredictor
 
 
 # home view
@@ -74,12 +75,21 @@ def home(request):
     schedule = fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank)
 
     # Last updated based on most recently updated game row, fallback to now
-
     latest_game_row = Game.objects.filter(date__year=year).order_by("-last_updated").first()
     if latest_game_row:
         last_updated = latest_game_row.last_updated
     else:
         last_updated = timezone.now()
+
+    # ----- ML PREDICTION -----
+    prediction = None
+    try:
+        predictor = GamePredictor()
+        prediction = predictor.predict_next_game(team_name=team)
+        if prediction:
+            print(f"Prediction: {prediction['predicted_winner']} with {prediction['win_probability']:.1f}% probability")
+    except Exception as e:
+        print(f"Prediction error: {e}")
 
     # ----- CONTEXT -----
     context = {
@@ -105,6 +115,7 @@ def home(request):
         "wr_receptions": wr_receptions,
         "schedule": schedule,
         "last_updated": last_updated,
+        "prediction": prediction,
     }
 
     return render(request, "stats/home.html", context)
