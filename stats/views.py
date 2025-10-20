@@ -17,11 +17,9 @@ from .cfb_api import (
 
 # home view
 def home(request):
-
     year = 2025
     team = "Oklahoma"
     conference = "SEC"
-
 
     # ----- TEAM RECORDS -----
     overall_record, conf_record = fetch_team_record(year, team, conference)
@@ -122,7 +120,6 @@ from .cfb_api import prettify_stat_name
 def boxscore(request):
     """Displays box score for the most recent completed game from the database (syncs if needed)."""
 
-
     year = 2025
     today = datetime.date.today()
 
@@ -146,7 +143,8 @@ def boxscore(request):
         )
 
     # --- If no stats cached yet, pull from API once ---
-    if not TeamStat.objects.filter(game=latest_game).exists() or not PlayerStat.objects.filter(game=latest_game).exists():
+    if not TeamStat.objects.filter(game=latest_game).exists() or not PlayerStat.objects.filter(
+            game=latest_game).exists():
         print(f"📡 Syncing stats for {latest_game.cfbd_game_id}...")
         sync_game_stats(latest_game.cfbd_game_id)
 
@@ -190,8 +188,8 @@ def boxscore(request):
         "team_stats": team_stats,
         "team_names": team_names,
         "player_stats": player_stats,
-         "home_logo": get_team_logo(latest_game.home_team.name if latest_game.home_team else None),
-         "away_logo": get_team_logo(latest_game.away_team.name if latest_game.away_team else None),
-     }
+        "home_logo": get_team_logo(latest_game.home_team.name if latest_game.home_team else None),
+        "away_logo": get_team_logo(latest_game.away_team.name if latest_game.away_team else None),
+    }
 
     return render(request, "stats/boxscore.html", context)
