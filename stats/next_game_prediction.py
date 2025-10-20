@@ -8,16 +8,84 @@ import os
 from django.conf import settings
 from .models import Game, Team, TeamStat
 import datetime
+import cfbd
 
 
 class GamePredictor:
     """Predicts the outcome of the next game using Historical Data and a Random Forest Classifier."""
 
     def __init__(self):
-        self.model = RandomForestClassifier(n_estimators=100, random_state=42)
+        self.model = RandomForestClassifier(n_estimators=150, random_state=42, max_depth=10)
         self.scaler = StandardScaler()
         self.model_path = os.path.join(settings.BASE_DIR, 'ml_models')
         os.makedirs(self.model_path, exist_ok=True)
+
+        # Cache for talent ratings
+        self.talent_cache = {}
+        self.ratings_cache = {}
+
+    def get_team_talent(self, team_name, year):
+        """Fetch team talent composite rating from CFBD API."""
+        cache_key = f"{team_name}_{year}"
+        if cache_key in self.talent_cache:
+            return self.talent_cache[cache_key]
+
+        try:
+            configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
+            with cfbd.ApiClient(configuration) as api_client:
+                teams_api = cfbd.TeamsApi(api_client)
+                talent = teams_api.get_talent(year=year)
+
+                for t in talent:
+                    # Correct attribute is 'team' not 'school'
+                    if t.team == team_name:
+                        self.talent_cache[cache_key] = t.talent
+                        return t.talent
+        except Exception as e:
+            print(f"Error fetching talent for {team_name}: {e}")
+
+        # Default talent rating if not found
+        return 500.0  # Average FBS team talent
+
+    def get_team_rating(self, team_name, year):
+        """Fetch team SP+ rating from CFBD API."""
+        cache_key = f"{team_name}_{year}"
+        if cache_key in self.ratings_cache:
+            return self.ratings_cache[cache_key]
+
+        try:
+            configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
+            with cfbd.ApiClient(configuration) as api_client:
+                ratings_api = cfbd.RatingsApi(api_client)
+                # Correct method is get_sp (not get_sp_ratings)
+                sp_ratings = ratings_api.get_sp(year=year)
+
+                for r in sp_ratings:
+                    if r.team == team_name:
+                        rating = r.rating if r.rating else 0.0
+                        self.ratings_cache[cache_key] = rating
+                        return rating
+        except Exception as e:
+            print(f"Error fetching rating for {team_name}: {e}")
+
+        return 0.0  # Neutral rating if not found
+
+    def get_recruiting_rank(self, team_name, year):
+        """Fetch team recruiting ranking from CFBD API."""
+        try:
+            configuration = cfbd.Configuration(access_token=os.environ.get("BEARER_TOKEN"))
+            with cfbd.ApiClient(configuration) as api_client:
+                recruiting_api = cfbd.RecruitingApi(api_client)
+                # Correct method is get_team_recruiting_rankings
+                rankings = recruiting_api.get_team_recruiting_rankings(year=year)
+
+                for r in rankings:
+                    if r.team == team_name:
+                        return r.rank if r.rank else 65
+        except Exception as e:
+            print(f"Error fetching recruiting rank for {team_name}: {e}")
+
+        return 65  # Average FBS ranking
 
     def prepare_features(self, game, team_name="Oklahoma"):
         """Extract features from a game for prediction."""
@@ -26,6 +94,17 @@ class GamePredictor:
         # Determine if Oklahoma is home or away
         is_oklahoma_home = game.home_team and game.home_team.name == team_name
         oklahoma_team = Team.objects.filter(name=team_name).first()
+
+        # Get opponent name
+        if is_oklahoma_home:
+            opponent_team = game.away_team
+            opponent_name = game.away_team.name if game.away_team else ""
+        else:
+            opponent_team = game.home_team
+            opponent_name = game.home_team.name if game.home_team else ""
+
+        # Get game year
+        game_year = game.season if game.season else game.date.year
 
         if is_oklahoma_home:
             oklahoma_prev_games = Game.objects.filter(
@@ -60,7 +139,7 @@ class GamePredictor:
 
         opponent_scores = []
         for g in opponent_prev_games:
-            if g.home_team == game.opponent:
+            if g.home_team == opponent_team:
                 opponent_scores.append(g.home_points or 0)
             else:
                 opponent_scores.append(g.away_points or 0)
@@ -83,8 +162,8 @@ class GamePredictor:
         )
         opponent_wins = sum(
             1 for g in opponent_prev_games
-            if (g.home_team == game.opponent and g.home_points > g.away_points) or
-               (g.away_team == game.opponent and g.away_points > g.home_points)
+            if (g.home_team == opponent_team and g.home_points > g.away_points) or
+               (g.away_team == opponent_team and g.away_points > g.home_points)
         )
 
         features['oklahoma_win_pct'] = oklahoma_wins / len(oklahoma_prev_games) if oklahoma_prev_games else 0.5
@@ -104,6 +183,29 @@ class GamePredictor:
 
         # Season progression (early season vs late season)
         features['week_number'] = game.week if game.week else 1
+
+        # === NEW TALENT & RATING FEATURES ===
+
+        # Team talent composite (247Sports talent composite)
+        oklahoma_talent = self.get_team_talent(team_name, game_year)
+        opponent_talent = self.get_team_talent(opponent_name, game_year)
+        features['oklahoma_talent'] = oklahoma_talent
+        features['opponent_talent'] = opponent_talent
+        features['talent_differential'] = oklahoma_talent - opponent_talent
+
+        # SP+ Ratings (advanced analytics rating)
+        oklahoma_rating = self.get_team_rating(team_name, game_year)
+        opponent_rating = self.get_team_rating(opponent_name, game_year)
+        features['oklahoma_sp_rating'] = oklahoma_rating
+        features['opponent_sp_rating'] = opponent_rating
+        features['rating_differential'] = oklahoma_rating - opponent_rating
+
+        # Recruiting rankings (talent pipeline indicator)
+        oklahoma_recruiting = self.get_recruiting_rank(team_name, game_year)
+        opponent_recruiting = self.get_recruiting_rank(opponent_name, game_year)
+        features['oklahoma_recruiting_rank'] = oklahoma_recruiting
+        features['opponent_recruiting_rank'] = opponent_recruiting
+        features['recruiting_advantage'] = opponent_recruiting - oklahoma_recruiting  # Lower is better
 
         return features
 
