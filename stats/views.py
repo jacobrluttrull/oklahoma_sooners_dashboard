@@ -117,23 +117,34 @@ from .cfb_api import sync_game_stats, get_team_logo
 from .cfb_api import prettify_stat_name
 
 
-def boxscore(request):
+def boxscore(request, game_id=None):
     """Displays box score for the most recent completed game from the database (syncs if needed)."""
 
     year = 2025
     today = datetime.date.today()
 
-    # --- Get most recent completed game ---
-    latest_game = (
-        Game.objects.filter(
-            season=year,
-            home_points__isnull=False,
-            away_points__isnull=False,
-            date__lt=today,
+    if game_id:
+        latest_game = Game.objects.filter(id=game_id).first()
+        if not latest_game:
+            return render(
+                request,
+                "stats/boxscore.html",
+                {"title": "Game Not Found", "message": f"No game found with ID {game_id}."},
+            )
+    else:
+
+
+        # --- Get most recent completed game ---
+        latest_game = (
+            Game.objects.filter(
+                season=year,
+                home_points__isnull=False,
+                away_points__isnull=False,
+                date__lt=today,
+            )
+            .order_by("-date")
+            .first()
         )
-        .order_by("-date")
-        .first()
-    )
 
     if not latest_game:
         return render(

@@ -35,7 +35,13 @@
                 <tr>
                     <td style="font-weight: 500;">{{ game.date|date:"M d, Y" }}</td>
                     <td style="font-weight: 600;">
-                        {{ game.opponent }}
+                        {% if game.id and game.result %}
+                            <a href="{% url 'stats:boxscore' game.id %}" style="text-decoration: none; color: #841617; font-weight: 600;">
+                                {{ game.opponent }}
+                            </a>
+                        {% else %}
+                            {{ game.opponent }}
+                        {% endif %}
                         {% if game.is_ranked %}
                             <span class="text-muted">(#{{ game.opponent_rank }})</span>
                         {% endif %}
@@ -125,7 +131,7 @@
                 <div style="margin-top: 1rem;">
                     <span class="badge bg-success">VICTORY</span>
                 </div>
-                <a href="{% url 'stats:boxscore' %}" class="btn btn-primary mt-3">View Latest Box Score</a>
+                <a href="{% url 'stats:boxscore_latest' %}" class="btn btn-primary mt-3">View Latest Box Score</a>
             {% else %}
                 <p class="text-muted mb-0">No victories to display yet!</p>
             {% endif %}

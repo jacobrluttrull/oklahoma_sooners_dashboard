@@ -401,6 +401,7 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                 )
 
                 schedule.append({
+                    "id": g.id,  # Add the game ID for clickable links
                     "date": g.date,
                     "opponent": opponent,
                     "location": "Home" if g.home_away == "H" else ("Neutral" if g.home_away == "N" else "Away"),
@@ -501,6 +502,7 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                 )
 
                 schedule.append({
+                    "id": game.id,  # Add the game ID for clickable links
                     "date": g.start_date,
                     "opponent": opponent_name,
                     "location": "Home" if is_home else ("Neutral" if bool(getattr(g, 'neutral_site', False)) else "Away"),
