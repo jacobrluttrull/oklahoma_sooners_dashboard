@@ -2,6 +2,7 @@ import os
 
 from django.utils import timezone
 
+from test_boxscore_prettify import today, year
 from .cfb_api import (
     get_rankings,
     normalize_name,
@@ -13,7 +14,6 @@ from .cfb_api import (
     fetch_player_stats,
     fetch_and_cache_schedule,
 )
-from .next_game_prediction import GamePredictor
 
 
 # home view
@@ -82,15 +82,6 @@ def home(request):
         last_updated = timezone.now()
 
     # ----- ML PREDICTION -----
-    prediction = None
-    try:
-        predictor = GamePredictor()
-        prediction = predictor.predict_next_game(team_name=team)
-        if prediction:
-            print(f"Prediction: {prediction['predicted_winner']} with {prediction['win_probability']:.1f}% probability")
-    except Exception as e:
-        print(f"Prediction error: {e}")
-
     # ----- CONTEXT -----
     context = {
         "title": f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
@@ -115,7 +106,6 @@ def home(request):
         "wr_receptions": wr_receptions,
         "schedule": schedule,
         "last_updated": last_updated,
-        "prediction": prediction,
     }
 
     return render(request, "stats/home.html", context)
@@ -131,8 +121,6 @@ from .cfb_api import prettify_stat_name
 def boxscore(request, game_id=None):
     """Displays box score for the most recent completed game from the database (syncs if needed)."""
 
-    year = 2025
-    today = datetime.date.today()
 
     if game_id:
         latest_game = Game.objects.filter(id=game_id).first()
