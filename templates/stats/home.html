@@ -83,10 +83,10 @@
                     {% endif %}
                 </h4>
 
-                <p style="margin-bottom: 0.5rem;"><strong>Date:</strong> {{ next_game.start_date|date:"l, F j, Y" }}</p>
-                <p style="margin-bottom: 0.5rem;"><strong>Time:</strong> {{ next_game.start_date|date:"g:i A T" }}</p>
+                <p style="margin-bottom: 0.5rem;"><span class="stat-label">Date:</span> {{ next_game.start_date|date:"l, F j, Y" }}</p>
+                <p style="margin-bottom: 0.5rem;"><span class="stat-label">Time:</span> {{ next_game.start_date|date:"g:i A T" }}</p>
                 {% if next_game.venue %}
-                    <p style="margin-bottom: 0;"><strong>Venue:</strong> {{ next_game.venue }}</p>
+                    <p style="margin-bottom: 0;"><span class="stat-label">Venue:</span> {{ next_game.venue }}</p>
                 {% endif %}
             {% else %}
                 <p class="text-muted mb-0">No more scheduled games!</p>
@@ -122,12 +122,12 @@
                         {% endif %}
                     {% endif %}
                 </h4>
-                <p style="margin-bottom: 0.5rem;"><strong>Date:</strong> {{ latest_victory.start_date|date:"F j, Y" }}</p>
+                <p style="margin-bottom: 0.5rem;"><span class="stat-label">Date:</span> {{ latest_victory.start_date|date:"F j, Y" }}</p>
                 {% if latest_victory.venue %}
-                    <p style="margin-bottom: 0.5rem;"><strong>Venue:</strong> {{ latest_victory.venue }}</p>
+                    <p style="margin-bottom: 0.5rem;"><span class="stat-label">Venue:</span> {{ latest_victory.venue }}</p>
                 {% endif %}
                 {% if latest_victory.attendance %}
-                    <p style="margin-bottom: 1rem;"><strong>Attendance:</strong> {{ latest_victory.attendance|floatformat:0 }}</p>
+                    <p style="margin-bottom: 1rem;"><span class="stat-label">Attendance:</span> {{ latest_victory.attendance|floatformat:0 }}</p>
                 {% endif %}
                 <div style="margin-top: 1rem;">
                     <span class="badge bg-success">VICTORY</span>
@@ -146,8 +146,8 @@
         <div class="card-body" style="padding: 0;">
             <ul class="list-group list-group-flush">
                 <li class="list-group-item">
-                    <div style="margin-bottom: 0.25rem;">
-                        <strong>Passing:</strong>
+                    <div style="margin-bottom: 0.25rem; white-space: nowrap;">
+                        <span class="stat-label">Passing:</span>
                         {% if passing_leader %}
                             {{ passing_leader.player }} – {{ passing_leader.stat }} yards, {{ passing_tds.stat }} TDs, {{ passing_leader_interceptions.stat }} INTs
                         {% else %}
@@ -172,7 +172,7 @@
                 </li>
                 <li class="list-group-item">
                     <div style="margin-bottom: 0.25rem;">
-                        <strong>Rushing:</strong>
+                        <span class="stat-label">Rushing:</span>
                         {% if rushing_leader %}
                             {{ rushing_leader.player }} – {{ rushing_leader.stat }} yards, {{ rushing_tds.stat }} TDs
                         {% else %}
@@ -194,7 +194,7 @@
                 </li>
                 <li class="list-group-item">
                     <div style="margin-bottom: 0.25rem;">
-                        <strong>Receiving:</strong>
+                        <span class="stat-label">Receiving:</span>
                         {% if receiving_leader %}
                             {{ receiving_leader.player }} – {{ receiving_leader.stat }} yards, {{ receiving_tds.stat }} TDs
                         {% else %}
