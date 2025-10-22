@@ -203,3 +203,7 @@ def boxscore(request, game_id=None):
     }
 
     return render(request, "stats/boxscore.html", context)
+
+def team_stats(request):
+    """This will display the current team stats page with averages, total values, and rankings among SEC and FBS teams. """
+

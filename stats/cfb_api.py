@@ -141,8 +141,10 @@ def fetch_team_record(year=2025, team="Oklahoma", conference="SEC"):
                 overall = api_response[0].total
                 conf = api_response[0].conference_games
                 overall_record = f"{overall.wins}-{overall.losses}"
+
                 conf_record = f"{conf.wins}-{conf.losses}"
-                return overall_record, conf_record
+                completed_games = overall.wins + overall.losses
+                return overall_record, conf_record, completed_games
         except Exception as e:
             print(f"Error fetching team record: {e}")
     return "N/A", "N/A"
@@ -428,6 +430,7 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     "is_ranked": is_ranked,
                     "opponent_rank": opponent_rank,
                 })
+
             return schedule
 
     # --- Otherwise, fetch fresh data ---
@@ -586,3 +589,11 @@ def sync_game_stats(game_id: int):
                             )
 
         print(f"Game stats synchronized successfully for {game_obj}")
+# ====== TEAM STATS ======
+def get_team_season_stats(year=2025, team="Oklahoma"):
+    """Fetch and cache total season team stats"""
+    with get_api_client() as api_client:
+        response = cfbd.StatsApi(api_client).get_team_stats(year=year, team=team)
+        completed_games = fetch_team_record(year =year, team=team)[2]
+
+
