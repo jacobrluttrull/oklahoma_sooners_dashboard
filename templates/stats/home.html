@@ -116,7 +116,7 @@
                             <span class="text-muted">(#{{ latest_victory.oklahoma_rank }})</span>
                         {% endif %}
                         {{ latest_victory.away_points }} - {{ latest_victory.home_points }}
-                        {{ latest_victory.away_team }}
+                        {{ latest_victory.home_team }}
                         {% if latest_victory.opponent_rank %}
                             <span class="text-muted">(#{{ latest_victory.opponent_rank }})</span>
                         {% endif %}
@@ -132,7 +132,11 @@
                 <div style="margin-top: 1rem;">
                     <span class="badge bg-success">VICTORY</span>
                 </div>
-                <a href="{% url 'stats:boxscore_latest' %}" class="btn btn-primary mt-3">View Latest Box Score</a>
+                {% if latest_victory.game_id %}
+                    <a href="{% url 'stats:boxscore' latest_victory.game_id %}" class="btn btn-primary mt-3">View Box Score</a>
+                {% else %}
+                    <a href="{% url 'stats:boxscore_latest' %}" class="btn btn-primary mt-3">View Latest Box Score</a>
+                {% endif %}
             {% else %}
                 <p class="text-muted mb-0">No victories to display yet!</p>
             {% endif %}

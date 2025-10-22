@@ -219,7 +219,25 @@ def fetch_latest_victory(year=2025, team="Oklahoma", rankings_map=None, latest_w
             if rankings_map and latest_week_with_rank and opponent_key in rankings_map.get(latest_week_with_rank, {}):
                 opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
 
+            # Get the game ID from the database
+            from .models import Game, Team
+            game_id = None
+            try:
+                home_team_obj = Team.objects.filter(name=latest.home_team).first()
+                away_team_obj = Team.objects.filter(name=latest.away_team).first()
+                if home_team_obj and away_team_obj:
+                    game_obj = Game.objects.filter(
+                        home_team=home_team_obj,
+                        away_team=away_team_obj,
+                        date=latest.start_date.date()
+                    ).first()
+                    if game_obj:
+                        game_id = game_obj.id
+            except Exception as e:
+                print(f"Error getting game ID: {e}")
+
             return {
+                "game_id": game_id,
                 "away_team": latest.away_team,
                 "home_team": latest.home_team,
                 "away_points": latest.away_points,
