@@ -7,60 +7,115 @@
              onerror="this.onerror=null;this.style.display='none';var t=document.getElementById('ou-logo-text'); if(t){t.style.display='inline-block';}">
         <span id="ou-logo-text" class="navbar-brand mb-0 h1" style="display:none; font-weight:700;">Oklahoma Sooners</span>
         <span class="navbar-brand mb-0 h1">{{ title }}</span>
+        <div class="ms-auto">
+            <a href="{% url 'stats:team_stats' %}" class="btn btn-team-stats btn-sm d-inline-flex align-items-center">
+                <!-- subtle icon space (keeps button compact) -->
+                <span style="display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:2px;background:rgba(255,255,255,0.9);opacity:0.9;"></span>
+                <span style="letter-spacing:0.2px;">Team Stats</span>
+            </a>
+        </div>
     </div>
 </nav>
 
+<style>
+    /* Brand colors and refined UI tweaks for a sleek, consistent look */
+    :root { --brand:#841617; --brand-dark:#6e1314; --muted:#6c757d; }
+    .brand-bg { background: linear-gradient(45deg, var(--brand), #a91b1c); }
+    .brand-color { color: var(--brand); }
+
+    /* Team Stats button - blends with navbar, compact and subtle */
+    .btn-team-stats {
+        color: rgba(255,255,255,0.95);
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.15);
+        box-shadow: none;
+        padding: .35rem .6rem;
+        border-radius: .35rem;
+        transition: all .12s ease-in-out;
+        text-decoration: none;
+        font-weight:600;
+    }
+    .btn-team-stats:hover {
+        background: rgba(255,255,255,0.07);
+        transform: translateY(-1px);
+        border-color: rgba(255,255,255,0.22);
+    }
+
+    /* General cards */
+    .card-smooth { border-radius: .5rem; box-shadow: 0 8px 28px rgba(9,10,11,0.06); }
+    .card .card-header { background: transparent; border-bottom: 0; }
+
+    /* Leaders grid */
+    .leaders-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+    @media (min-width: 768px) { .leaders-grid { grid-template-columns: repeat(3, 1fr); } }
+    .leader-tile { background: #fff; border-radius: .5rem; padding: 1rem; border: 1px solid rgba(16,24,32,0.04); }
+
+    .leader-label { font-size: .85rem; font-weight:700; color: var(--brand); text-transform:uppercase; letter-spacing:0.6px; }
+    .player-name { font-size: 1.05rem; font-weight:700; color:#0b0b0b; margin-top:0.2rem; }
+    .leader-meta { color: var(--muted); font-size: .92rem; margin-top:0.5rem; }
+
+    .stat-value { font-weight:700; color: #000; }
+    .muted-stat { color: #495057; }
+</style>
+
 <div class="container mt-4">
-    <div class="jumbotron text-center p-5 rounded text-white" style="background: linear-gradient(45deg, #841617, #a91b1c);">
-        <h1 class="display-4">{{ message }}</h1>
-        <footer style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.95;">
-            Last updated: {{ last_updated|date:"F j, Y, g:i A T" }}
-        </footer>
+    <div class="card card-smooth text-white brand-bg p-4 mb-4" style="border: none;">
+        <div class="row align-items-center">
+            <div class="col-md-9">
+                <h1 class="display-6 mb-1" style="font-weight:700;">{{ message }}</h1>
+                <footer style="font-size: 0.9rem; opacity: 0.95;">Last updated: {{ last_updated|date:"F j, Y, g:i A T" }}</footer>
+            </div>
+            <div class="col-md-3 text-md-end mt-3 mt-md-0">
+                <img src="{% static 'images/Oklahoma_Sooners_logo.svg' %}" alt="OU" width="48" class="d-inline-block" onerror="this.style.display='none';">
+            </div>
+        </div>
     </div>
 
-    <h2 class="mt-4">Season Schedule</h2>
-    <div class="card mb-4">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Opponent</th>
-                    <th>Location</th>
-                    <th>Score</th>
-                    <th>Result</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for game in schedule %}
-                <tr>
-                    <td style="font-weight: 500;">{{ game.date|date:"M d, Y" }}</td>
-                    <td style="font-weight: 600;">
-                        {% if game.id and game.result %}
-                            <a href="{% url 'stats:boxscore' game.id %}" style="text-decoration: none; color: #841617; font-weight: 600;">
+    <h2 class="mt-2 mb-3">Season Schedule</h2>
+    <div class="card mb-4 card-smooth">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Opponent</th>
+                        <th>Location</th>
+                        <th>Score</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for game in schedule %}
+                    <tr>
+                        <td style="font-weight: 500;">{{ game.date|date:"M d, Y" }}</td>
+                        <td style="font-weight: 600;">
+                            {% if game.id and game.result %}
+                                <a href="{% url 'stats:boxscore' game.id %}" style="text-decoration: none; color: var(--brand); font-weight: 600;">
+                                    {{ game.opponent }}
+                                </a>
+                            {% else %}
                                 {{ game.opponent }}
-                            </a>
-                        {% else %}
-                            {{ game.opponent }}
-                        {% endif %}
-                        {% if game.is_ranked %}
-                            <span class="text-muted">(#{{ game.opponent_rank }})</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ game.location }}</td>
-                    <td style="font-weight: 500;">{{ game.score }}</td>
-                    <td>
-                        {% if game.result == "W" %}
-                            <span class="badge bg-success">WIN</span>
-                        {% elif game.result == "L" %}
-                            <span class="badge bg-danger">LOSS</span>
-                        {% else %}
-                            <span class="badge bg-secondary">TBD</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                            {% endif %}
+                            {% if game.is_ranked %}
+                                <span class="text-muted">(#{{ game.opponent_rank }})</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ game.location }}</td>
+                        <td style="font-weight: 500;">{{ game.score }}</td>
+                        <td>
+                            {% if game.result == "W" %}
+                                <span class="badge bg-success">WIN</span>
+                            {% elif game.result == "L" %}
+                                <span class="badge bg-danger">LOSS</span>
+                            {% else %}
+                                <span class="badge bg-secondary">TBD</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div class="card mb-4">
@@ -143,76 +198,46 @@
         </div>
     </div>
 
-    <div class="card mt-4 mb-5">
-        <div class="card-header">
-            <h5 class="mb-0">2025 Offensive Leaders</h5>
+    <div class="card mt-4 mb-5 card-smooth">
+        <div class="card-header bg-white">
+            <h5 class="mb-0 brand-color">2025 Offensive Leaders</h5>
         </div>
-        <div class="card-body" style="padding: 0;">
-            <ul class="list-group list-group-flush">
-                <li class="list-group-item">
-                    <div style="margin-bottom: 0.25rem; white-space: nowrap;">
-                        <span class="stat-label">Passing:</span>
-                        {% if passing_leader %}
-                            {{ passing_leader.player }} – {{ passing_leader.stat }} yards, {{ passing_tds.stat }} TDs, {{ passing_leader_interceptions.stat }} INTs
-                        {% else %}
-                            N/A
-                        {% endif %}
-                    </div>
+        <div class="card-body">
+            <div class="leaders-grid">
+                <div class="leader-tile">
+                    <div class="leader-label">Passing</div>
                     {% if passing_leader %}
-                        <div style="font-size: 0.9rem; padding-left: 1.25rem;">
-                            <span class="text-muted">Rushing:</span>
-                            <span>
-                                {% if qb_rushing_yards %}
-                                    {{ qb_rushing_yards.stat }} yards, {{ qb_rushing_tds.stat }} TDs
-                                {% else %}
-                                    0 yards, 0 TDs
-                                {% endif %}
-                            </span>
-                            <span class="text-muted">&nbsp;|&nbsp;</span>
-                            <span class="text-muted">Combined TDs:</span>
-                            <span>{{ qb_combined_tds }}</span>
-                        </div>
+                        <div class="player-name">{{ passing_leader.player }} &ndash; <span class="stat-value">{{ passing_leader.stat }}</span> yards</div>
+                        <div class="leader-meta">TDs: <span class="stat-value">{{ passing_tds.stat }}</span> &nbsp;|&nbsp; INTs: <span class="stat-value">{{ passing_leader_interceptions.stat }}</span></div>
+                        <div class="leader-meta">Rushing: <span class="stat-value">{% if qb_rushing_yards %}{{ qb_rushing_yards.stat }} yards{% else %}0 yards{% endif %}</span> &nbsp;|&nbsp; TDs: <span class="stat-value">{% if qb_rushing_tds %}{{ qb_rushing_tds.stat }}{% else %}0{% endif %}</span></div>
+                        <div class="leader-meta">Combined TDs: <span class="stat-value">{{ qb_combined_tds }}</span></div>
+                    {% else %}
+                        <div class="leader-meta">N/A</div>
                     {% endif %}
-                </li>
-                <li class="list-group-item">
-                    <div style="margin-bottom: 0.25rem;">
-                        <span class="stat-label">Rushing:</span>
-                        {% if rushing_leader %}
-                            {{ rushing_leader.player }} – {{ rushing_leader.stat }} yards, {{ rushing_tds.stat }} TDs
-                        {% else %}
-                            N/A
-                        {% endif %}
-                    </div>
+                </div>
+
+                <div class="leader-tile">
+                    <div class="leader-label">Rushing</div>
                     {% if rushing_leader %}
-                        <div style="font-size: 0.9rem; padding-left: 1.25rem;">
-                            <span class="text-muted">Receiving:</span>
-                            <span>
-                                {% if rb_receptions %}
-                                    {{ rb_receptions.stat }} rec, {{ rb_receiving_yards.stat }} yards, {{ rb_receiving_tds.stat }} TDs
-                                {% else %}
-                                    0 rec, 0 yards, 0 TDs
-                                {% endif %}
-                            </span>
-                        </div>
+                        <div class="player-name">{{ rushing_leader.player }} &ndash; <span class="stat-value">{{ rushing_leader.stat }}</span> yards</div>
+                        <div class="leader-meta">TDs: <span class="stat-value">{{ rushing_tds.stat }}</span></div>
+                        <div class="leader-meta">Receiving (from RB): <span class="stat-value">{% if rb_receptions %}{{ rb_receptions.stat }} rec, {{ rb_receiving_yards.stat }} yards, {{ rb_receiving_tds.stat }} TDs{% else %}0 rec, 0 yards, 0 TDs{% endif %}</span></div>
+                    {% else %}
+                        <div class="leader-meta">N/A</div>
                     {% endif %}
-                </li>
-                <li class="list-group-item">
-                    <div style="margin-bottom: 0.25rem;">
-                        <span class="stat-label">Receiving:</span>
-                        {% if receiving_leader %}
-                            {{ receiving_leader.player }} – {{ receiving_leader.stat }} yards, {{ receiving_tds.stat }} TDs
-                        {% else %}
-                            N/A
-                        {% endif %}
-                    </div>
-                    {% if receiving_leader and wr_receptions %}
-                        <div style="font-size: 0.9rem; padding-left: 1.25rem;">
-                            <span class="text-muted">Receptions:</span>
-                            <span>{{ wr_receptions.stat }}</span>
-                        </div>
+                </div>
+
+                <div class="leader-tile">
+                    <div class="leader-label">Receiving</div>
+                    {% if receiving_leader %}
+                        <div class="player-name">{{ receiving_leader.player }} &ndash; <span class="stat-value">{{ receiving_leader.stat }}</span> yards</div>
+                        <div class="leader-meta">TDs: <span class="stat-value">{{ receiving_tds.stat }}</span></div>
+                        <div class="leader-meta">Receptions: <span class="stat-value">{% if wr_receptions %}{{ wr_receptions.stat }}{% else %}0{% endif %}</span></div>
+                    {% else %}
+                        <div class="leader-meta">N/A</div>
                     {% endif %}
-                </li>
-            </ul>
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -358,11 +358,104 @@ def update_teams_from_conference(conference: str, year: int = 2025):
             print(f"{'Created' if created else 'Updated'}: {team.name} → {team.logo_url or 'No logo'}")
 
 
-def get_team_logo(team_name: str):
-    team = Team.objects.filter(name__iexact=team_name).first()
-    if team and team.logo_url:
-        return team.logo_url
-    return None
+def ensure_team_logo(team_name: str, year: int = 2025):
+    """Ensure we have a logo_url for a team: check DB, otherwise fetch from CFBD and cache it.
+
+    Returns the logo URL if found, otherwise None.
+    """
+    if not team_name:
+        return None
+
+    try:
+        # Try to find an existing Team DB entry first
+        team_obj = Team.objects.filter(name__iexact=team_name).first() or Team.objects.filter(abbreviation__iexact=team_name).first()
+        if team_obj and team_obj.logo_url:
+            return team_obj.logo_url
+
+        # Fetch list of teams from CFBD and try to match
+        with get_api_client() as api_client:
+            teams_api = cfbd.TeamsApi(api_client)
+            api_teams = teams_api.get_teams(year=year)
+
+        target_norm = normalize_name(team_name)
+        match = None
+        for t in api_teams:
+            school = getattr(t, 'school', '')
+            if not school:
+                continue
+            if normalize_name(school) == target_norm:
+                match = t
+                break
+            # also check abbreviation match
+            abb = getattr(t, 'abbreviation', None)
+            if abb and abb.strip().upper() == team_name.strip().upper():
+                match = t
+                break
+
+        # fallback: substring match
+        if not match:
+            for t in api_teams:
+                school = getattr(t, 'school', '')
+                if not school:
+                    continue
+                if target_norm in normalize_name(school):
+                    match = t
+                    break
+
+        if match:
+            # Create or update Team DB record
+            team_db, created = Team.objects.get_or_create(name=match.school)
+            team_db.abbreviation = getattr(match, 'abbreviation', None) or team_db.abbreviation
+            team_db.conference = getattr(match, 'conference', '') or team_db.conference
+            team_db.color = getattr(match, 'color', None) or team_db.color
+            team_db.alternate_color = getattr(match, 'alternateColor', None) or team_db.alternate_color
+            team_db.cfbd_team_id = getattr(match, 'id', None) or team_db.cfbd_team_id
+
+            logos = getattr(match, 'logos', []) or []
+            if logos and len(logos) > 0:
+                team_db.logo_url = logos[0].replace("http://", "https://")
+            else:
+                # keep any existing value or empty string
+                team_db.logo_url = team_db.logo_url or ""
+
+            team_db.save()
+            return team_db.logo_url or None
+
+    except Exception as e:
+        print(f"Error ensuring team logo for '{team_name}': {e}")
+
+    # Last-resort: if we had a team_obj earlier, return whatever it had
+    try:
+        team_obj = Team.objects.filter(name__iexact=team_name).first() or Team.objects.filter(abbreviation__iexact=team_name).first()
+        return team_obj.logo_url if team_obj else None
+    except Exception:
+        return None
+
+
+def get_team_logo(team_name_or_obj):
+    """Return a team's logo URL.
+
+    Accepts either a Team model instance or a team-name string. If no logo is found in the DB
+    this will attempt to fetch it from the CFBD API and cache it in the Team table.
+    """
+    if not team_name_or_obj:
+        return None
+
+    # If a Team object was passed, use it directly
+    if isinstance(team_name_or_obj, Team):
+        if team_name_or_obj.logo_url:
+            return team_name_or_obj.logo_url
+        # try to ensure a logo for this team
+        return ensure_team_logo(team_name_or_obj.name)
+
+    # Otherwise assume it's a string name/abbreviation
+    name = str(team_name_or_obj)
+    team_obj = Team.objects.filter(name__iexact=name).first() or Team.objects.filter(abbreviation__iexact=name).first()
+    if team_obj and team_obj.logo_url:
+        return team_obj.logo_url
+
+    # Attempt to fetch/cache from CFBD and return result
+    return ensure_team_logo(name)
 
 
 def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
@@ -600,6 +693,3 @@ def get_team_season_stats(year=2025, team="Oklahoma"):
         except Exception as e:
             print(f"Error fetching team season stats: {e}")
             return []
-
-
-

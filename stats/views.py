@@ -1,8 +1,9 @@
 import os
 
+from dateutil.utils import today
 from django.utils import timezone
+from scipy.constants import year
 
-from test_boxscore_prettify import today, year
 from .cfb_api import (
     get_rankings,
     normalize_name,
@@ -13,6 +14,7 @@ from .cfb_api import (
     fetch_latest_victory,
     fetch_player_stats,
     fetch_and_cache_schedule,
+    ensure_team_logo,  # added: ensure logos are fetched when missing
 )
 
 
@@ -74,6 +76,30 @@ def home(request):
     # ----- SCHEDULE -----
     schedule = fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank)
 
+    # Ensure logos for schedule opponents are present (backfill if DB was rebuilt)
+    try:
+        for entry in schedule or []:
+            opp = entry.get('opponent') if isinstance(entry, dict) else None
+            if opp:
+                ensure_team_logo(opp, year=year)
+    except Exception as e:
+        print(f"Warning while ensuring schedule logos: {e}")
+
+    # Ensure logos for next game and latest victory as well
+    try:
+        if next_game:
+            ensure_team_logo(next_game.get('away_team') or next_game.get('away_team_name') if isinstance(next_game, dict) else getattr(next_game, 'away_team', None), year=year)
+            ensure_team_logo(next_game.get('home_team') or next_game.get('home_team_name') if isinstance(next_game, dict) else getattr(next_game, 'home_team', None), year=year)
+    except Exception:
+        pass
+
+    try:
+        if latest_victory:
+            ensure_team_logo(latest_victory.get('away_team') or getattr(latest_victory, 'away_team', None), year=year)
+            ensure_team_logo(latest_victory.get('home_team') or getattr(latest_victory, 'home_team', None), year=year)
+    except Exception:
+        pass
+
     # Last updated based on most recently updated game row, fallback to now
     latest_game_row = Game.objects.filter(date__year=year).order_by("-last_updated").first()
     if latest_game_row:
@@ -81,7 +107,7 @@ def home(request):
     else:
         last_updated = timezone.now()
 
-    # ----- ML PREDICTION -----
+
     # ----- CONTEXT -----
     context = {
         "title": f"Oklahoma Football - Season Record: {overall_record}, Conference Record: {conf_record}",
@@ -111,7 +137,6 @@ def home(request):
     return render(request, "stats/home.html", context)
 
 
-import datetime
 from django.shortcuts import render
 from .models import Game, TeamStat, PlayerStat
 from .cfb_api import sync_game_stats, get_team_logo
@@ -155,7 +180,15 @@ def boxscore(request, game_id=None):
     # --- If no stats cached yet, pull from API once ---
     if not TeamStat.objects.filter(game=latest_game).exists() or not PlayerStat.objects.filter(
             game=latest_game).exists():
-        print(f"📡 Syncing stats for {latest_game.cfbd_game_id}...")
+        print(f" Syncing stats for {latest_game.cfbd_game_id}...")
+        for team_name in [latest_game.home_team, latest_game.away_team]:
+            if team_name:
+                # Ensure logos exist (backfill missing ones) before syncing stats
+                try:
+                    ensure_team_logo(team_name.name if hasattr(team_name, 'name') else team_name, year=latest_game.season)
+                except Exception:
+                    pass
+                get_team_logo(team_name)
         sync_game_stats(latest_game.cfbd_game_id)
 
     # --- Fetch from DB ---
@@ -207,3 +240,5 @@ def boxscore(request, game_id=None):
 def team_stats(request):
     """This will display the current team stats page with averages, total values, and rankings among SEC and FBS teams. """
 
+
+    return render(request, "stats/team_stats.html", {})
