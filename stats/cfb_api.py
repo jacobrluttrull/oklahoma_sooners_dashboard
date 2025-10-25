@@ -741,7 +741,7 @@ def fetch_conference_standings(year=2025, conference="SEC"):
     standings.sort(key=lambda x: (-x['conference_wins'], x['conference_losses'], -x['total_wins'], x['team']))
 
     # Calculate positions with ties based ONLY on conference record
-    current_rank = 1
+
     for i, entry in enumerate(standings):
         if i == 0:
             entry['position'] = 1
