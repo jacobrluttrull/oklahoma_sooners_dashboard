@@ -693,3 +693,75 @@ def get_team_season_stats(year=2025, team="Oklahoma"):
         except Exception as e:
             print(f"Error fetching team season stats: {e}")
             return []
+
+
+def fetch_conference_standings(year=2025, conference="SEC"):
+    """Fetch conference standings by querying records for all teams in the conference."""
+
+    # SEC teams (2024-2025 lineup)
+    sec_teams = [
+        "Alabama", "Arkansas", "Auburn", "Florida", "Georgia", "Kentucky",
+        "LSU", "Mississippi State", "Missouri", "Ole Miss", "Oklahoma",
+        "South Carolina", "Tennessee", "Texas", "Texas A&M", "Vanderbilt"
+    ]
+
+    standings = []
+
+    for team in sec_teams:
+        try:
+            with get_api_client() as api_client:
+                api = cfbd.GamesApi(api_client)
+                api_response = api.get_records(year=year, team=team, conference=conference)
+
+                if api_response and len(api_response) > 0:
+                    record = api_response[0]
+                    overall = record.total
+                    conf = record.conference_games
+
+                    standings.append({
+                        'team': team,
+                        'conference_wins': conf.wins or 0,
+                        'conference_losses': conf.losses or 0,
+                        'total_wins': overall.wins or 0,
+                        'total_losses': overall.losses or 0,
+                        'conference_win_pct': conf.wins / (conf.wins + conf.losses) if (conf.wins + conf.losses) > 0 else 0,
+                    })
+        except Exception as e:
+            print(f"Error fetching record for {team}: {e}")
+            standings.append({
+                'team': team,
+                'conference_wins': 0,
+                'conference_losses': 0,
+                'total_wins': 0,
+                'total_losses': 0,
+                'conference_win_pct': 0,
+            })
+
+    # Sort by: conference wins (desc), conference losses (asc), total wins (desc), team name (asc)
+    standings.sort(key=lambda x: (-x['conference_wins'], x['conference_losses'], -x['total_wins'], x['team']))
+
+    # Calculate positions with ties based ONLY on conference record
+    current_rank = 1
+    for i, entry in enumerate(standings):
+        if i == 0:
+            entry['position'] = 1
+            entry['tied'] = False
+        else:
+            prev = standings[i - 1]
+            # Check if tied - ONLY based on conference record
+            if (entry['conference_wins'] == prev['conference_wins'] and
+                entry['conference_losses'] == prev['conference_losses']):
+                entry['position'] = prev['position']
+                entry['tied'] = True
+                prev['tied'] = True  # Mark previous as tied too
+            else:
+                current_rank = i + 1
+                entry['position'] = current_rank
+                entry['tied'] = False
+
+    return standings
+
+
+
+
+

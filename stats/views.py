@@ -14,7 +14,7 @@ from .cfb_api import (
     fetch_latest_victory,
     fetch_player_stats,
     fetch_and_cache_schedule,
-    ensure_team_logo,  # added: ensure logos are fetched when missing
+    ensure_team_logo, fetch_conference_standings,  # added: ensure logos are fetched when missing
 )
 
 
@@ -242,3 +242,36 @@ def team_stats(request):
 
 
     return render(request, "stats/team_stats.html", {})
+
+def conference_standings(request):
+    """Displays the current conference standings for the SEC and highlights Oklahoma's position."""
+    year = 2025
+    conference = "SEC"
+    team = "Oklahoma"
+
+    standings = fetch_conference_standings(year, conference)
+
+    oklahoma_position = None
+    oklahoma_tied = False
+
+    for entry in standings:
+        if normalize_name(entry['team']) == normalize_name(team):
+            oklahoma_position = entry['position']
+            oklahoma_tied = entry['tied']
+            entry['is_oklahoma'] = True
+        else:
+            entry['is_oklahoma'] = False
+
+    context = {
+        "title": f"{conference} Conference Standings - {year}",
+        'conference': conference,
+        "year": year,
+        "standings": standings,
+        "oklahoma_position": oklahoma_position,
+        "oklahoma_tied": oklahoma_tied,
+    }
+    return render(request, "stats/conference_standings.html", context)
+
+
+
+

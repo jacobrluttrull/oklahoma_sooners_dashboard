@@ -7,4 +7,5 @@ urlpatterns = [
     path('boxscore/', views.boxscore, name='boxscore_latest'), # keep for backward compatibility
     path('boxscore/<int:game_id>/', views.boxscore, name='boxscore'), # New route with game_id
     path("team_stats/", views.team_stats, name="team_stats"), # team stats view
+    path('conference_standings/', views.conference_standings, name='conference_standings'), # conference standings view
 ]
