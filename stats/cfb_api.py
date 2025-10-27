@@ -694,6 +694,24 @@ def get_team_season_stats(year=2025, team="Oklahoma"):
             print(f"Error fetching team season stats: {e}")
             return []
 
+team_ppg_cache = {}
+def get_team_ppg(year=2025, team="Oklahoma"):
+    """
+    Fetch and cache a teams points per game for a given week.
+    :param year:
+    :param team:
+    :return:
+    """
+    sec_teams = [
+        "Alabama", "Arkansas", "Auburn", "Florida", "Georgia", "Kentucky",
+        "LSU", "Mississippi State", "Missouri", "Ole Miss", "Oklahoma",
+        "South Carolina", "Tennessee", "Texas", "Texas A&M", "Vanderbilt"
+    ]
+    cache_key = f"{team}-{year}-ppg"
+    pass
+
+
+
 
 def fetch_conference_standings(year=2025, conference="SEC"):
     """Fetch conference standings by querying records for all teams in the conference."""
@@ -712,6 +730,8 @@ def fetch_conference_standings(year=2025, conference="SEC"):
             with get_api_client() as api_client:
                 api = cfbd.GamesApi(api_client)
                 api_response = api.get_records(year=year, team=team, conference=conference)
+                team_points = get_team_season_stats(2025, team=team)
+
 
                 if api_response and len(api_response) > 0:
                     record = api_response[0]
@@ -725,6 +745,7 @@ def fetch_conference_standings(year=2025, conference="SEC"):
                         'total_wins': overall.wins or 0,
                         'total_losses': overall.losses or 0,
                         'conference_win_pct': conf.wins / (conf.wins + conf.losses) if (conf.wins + conf.losses) > 0 else 0,
+                        #'average_points_game':
                     })
         except Exception as e:
             print(f"Error fetching record for {team}: {e}")
