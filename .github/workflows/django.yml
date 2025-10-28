@@ -8,8 +8,12 @@ on:
 
 jobs:
   build:
+  
 
     runs-on: ubuntu-latest
+    env: 
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+
     strategy:
       max-parallel: 4
       matrix:
