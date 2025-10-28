@@ -1,5 +1,6 @@
 import datetime
 import os
+from collections import defaultdict
 from datetime import timedelta
 import re
 
@@ -10,6 +11,12 @@ from django.utils import timezone
 from django.db.models import Q
 
 from .models import Game, Team, TeamStat, PlayerStat, Player
+
+
+SEC_TEAMS = [
+    "Alabama", "Arkansas", "Auburn", "Florida", "Georgia", "Kentucky",
+    "LSU", "Mississippi State", "Missouri", "Ole Miss", "Oklahoma",
+    "South Carolina", "Tennessee", "Texas", "Texas A&M", "Vanderbilt"]
 
 
 # =========================
@@ -26,17 +33,28 @@ def get_api_client():
 # NORMALIZATION
 # =========================
 
+import html
+
 def normalize_name(name: str) -> str:
-    """Normalize team names to improve matching between CFBD API datasets."""
     if not name:
         return ""
-    return (
-        name.upper()
-        .replace(".", "")
+    import html
+    name = html.unescape(name).upper()
+    name = (
+        name.replace(".", "")
         .replace("&", "AND")
+        .replace("AMP;", "")
         .replace("-", " ")
         .strip()
     )
+    # Fix common variations
+    replacements = {
+        "MISSISSIPPI ST": "MISSISSIPPI STATE",
+        "S CAROLINA": "SOUTH CAROLINA",
+        "OLE MISS": "MISSISSIPPI",
+    }
+    return replacements.get(name, name)
+
 
 
 def prettify_stat_name(name: str) -> str:
@@ -694,22 +712,53 @@ def get_team_season_stats(year=2025, team="Oklahoma"):
             print(f"Error fetching team season stats: {e}")
             return []
 
-team_ppg_cache = {}
-def get_team_ppg(year=2025, team="Oklahoma"):
-    """
-    Fetch and cache a teams points per game for a given week.
-    :param year:
-    :param team:
-    :return:
-    """
-    sec_teams = [
-        "Alabama", "Arkansas", "Auburn", "Florida", "Georgia", "Kentucky",
-        "LSU", "Mississippi State", "Missouri", "Ole Miss", "Oklahoma",
-        "South Carolina", "Tennessee", "Texas", "Texas A&M", "Vanderbilt"
-    ]
-    cache_key = f"{team}-{year}-ppg"
-    pass
 
+
+
+def get_team_ppg(year=2025, conference="SEC"):
+    """
+    Fetch and cache SEC teams' average points per game (PPG) for a given year.
+    Only includes SEC teams. Cached for 1 hour.
+    """
+    cache_key = f"{conference}-{year}-ppg"
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        return cached_data
+
+    team_stats = defaultdict(lambda: {'points_per_game': 0.0, 'games_played': 0})
+
+    with get_api_client() as api_client:
+        api = cfbd.GamesApi(api_client)
+        games = api.get_games(year=year, conference=conference)
+
+        for g in games:
+            if not g.completed:
+                continue
+
+            home_team = g.home_team
+            away_team = g.away_team
+            home_points = float(g.home_points or 0)
+            away_points = float(g.away_points or 0)
+
+            # Only SEC teams get counted
+            if home_team in SEC_TEAMS:
+                team_stats[home_team]['points_per_game'] += home_points
+                team_stats[home_team]['games_played'] += 1
+
+            if away_team in SEC_TEAMS:
+                team_stats[away_team]['points_per_game'] += away_points
+                team_stats[away_team]['games_played'] += 1
+
+    # Compute averages using correct keys
+    sec_team_ppg = {
+        team: (data["points_per_game"] / data["games_played"])
+        for team, data in team_stats.items()
+        if data["games_played"] > 0 and team in SEC_TEAMS
+    }
+
+    # Cache for 1 hour
+    cache.set(cache_key, sec_team_ppg, timeout=3600)
+    return sec_team_ppg
 
 
 

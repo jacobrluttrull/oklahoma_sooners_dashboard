@@ -14,7 +14,8 @@ from .cfb_api import (
     fetch_latest_victory,
     fetch_player_stats,
     fetch_and_cache_schedule,
-    ensure_team_logo, fetch_conference_standings,  # added: ensure logos are fetched when missing
+    ensure_team_logo, fetch_conference_standings,
+    get_team_ppg# added: ensure logos are fetched when missing
 )
 
 
@@ -243,18 +244,32 @@ def team_stats(request):
 
     return render(request, "stats/team_stats.html", {})
 
+
 def conference_standings(request):
     """Displays the current conference standings for the SEC and highlights Oklahoma's position."""
     year = 2025
     conference = "SEC"
     team = "Oklahoma"
 
+    # Get cached points-per-game data
+    ppg_data = get_team_ppg(year=year, conference=conference)
     standings = fetch_conference_standings(year, conference)
 
     oklahoma_position = None
     oklahoma_tied = False
 
     for entry in standings:
+        # Normalize and find PPG value safely
+        entry['ppg'] = next(
+            (ppg_value for ppg_team, ppg_value in ppg_data.items()
+             if normalize_name(ppg_team) == normalize_name(entry['team'])),
+            'N/A'
+        )
+
+        # Debug check (optional)
+        print(entry["team"], "→", entry["ppg"])
+
+        # Highlight Oklahoma
         if normalize_name(entry['team']) == normalize_name(team):
             oklahoma_position = entry['position']
             oklahoma_tied = entry['tied']
@@ -264,13 +279,15 @@ def conference_standings(request):
 
     context = {
         "title": f"{conference} Conference Standings - {year}",
-        'conference': conference,
+        "conference": conference,
         "year": year,
         "standings": standings,
         "oklahoma_position": oklahoma_position,
         "oklahoma_tied": oklahoma_tied,
     }
+
     return render(request, "stats/conference_standings.html", context)
+
 
 
 

@@ -35,7 +35,7 @@
                     <td>{{ entry.conference_wins }}-{{ entry.conference_losses }}</td>
                     <td>{{ entry.total_wins }}-{{ entry.total_losses }}</td>
                     <td>{{ entry.conference_win_pct|floatformat:3 }}</td>
-
+                    <td>{{ entry.ppg|floatformat:1 }}</td>
                 </tr>
                 {% empty %}
                 <tr>
