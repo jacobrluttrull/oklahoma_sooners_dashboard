@@ -1,3 +1,22 @@
+# Core Django Framework
 Django==5.2.6
-cfbd
-pytz
+
+# College Football Database API Client
+cfbd==5.13.2
+
+# Timezone handling
+pytz==2025.2
+
+# Required by cfbd package
+urllib3==2.4.0
+certifi==2025.4.26
+python-dateutil==2.9.0.post0
+six==1.17.0
+pydantic==1.10.24
+aenum==3.1.16
+
+# ASGI support
+asgiref==3.10.0
+
+# Database support
+sqlparse==0.5.3

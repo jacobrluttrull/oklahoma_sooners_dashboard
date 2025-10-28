@@ -1,8 +1,7 @@
 import os
+from datetime import date
 
-from dateutil.utils import today
 from django.utils import timezone
-from scipy.constants import year
 
 from .cfb_api import (
     get_rankings,
@@ -147,6 +146,8 @@ from .cfb_api import prettify_stat_name
 def boxscore(request, game_id=None):
     """Displays box score for the most recent completed game from the database (syncs if needed)."""
 
+    year = 2025
+    today = date.today()
 
     if game_id:
         latest_game = Game.objects.filter(id=game_id).first()

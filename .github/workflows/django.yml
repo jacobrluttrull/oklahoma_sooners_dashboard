@@ -12,7 +12,7 @@ jobs:
 
     runs-on: ubuntu-latest
     env: 
-      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      BEARER_TOKEN: ${{ secrets.CFBD_API_KEY }}
 
     strategy:
       max-parallel: 4
