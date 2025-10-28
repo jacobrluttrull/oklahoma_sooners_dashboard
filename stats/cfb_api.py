@@ -775,27 +775,62 @@ def fetch_conference_standings(year=2025, conference="SEC"):
     standings = []
 
     for team in sec_teams:
+        streak_str = '0'
         try:
             with get_api_client() as api_client:
                 api = cfbd.GamesApi(api_client)
                 api_response = api.get_records(year=year, team=team, conference=conference)
-                team_points = get_team_season_stats(2025, team=team)
 
-
+                overall = None
+                conf = None
                 if api_response and len(api_response) > 0:
                     record = api_response[0]
                     overall = record.total
                     conf = record.conference_games
 
-                    standings.append({
-                        'team': team,
-                        'conference_wins': conf.wins or 0,
-                        'conference_losses': conf.losses or 0,
-                        'total_wins': overall.wins or 0,
-                        'total_losses': overall.losses or 0,
-                        'conference_win_pct': conf.wins / (conf.wins + conf.losses) if (conf.wins + conf.losses) > 0 else 0,
-                        #'average_points_game':
-                    })
+                # fetch past games for streak calculation
+                try:
+                    games = api.get_games(year=year, team=team)
+                    past_games = [
+                        g for g in games
+                        if hasattr(g, "start_date") and g.start_date.date() < datetime.date.today()
+                        and getattr(g, "home_points", None) is not None and getattr(g, "away_points", None) is not None
+                    ]
+                    past_games = sorted(past_games, key=lambda g: g.start_date, reverse=True)
+
+                    if past_games:
+                        streak_count = 0
+                        streak_type = None
+                        for g in past_games:
+                            is_win = (
+                                (g.home_team == team and (g.home_points or 0) > (g.away_points or 0)) or
+                                (g.away_team == team and (g.away_points or 0) > (g.home_points or 0))
+                            )
+                            result = 'W' if is_win else 'L'
+                            if streak_type is None:
+                                streak_type = result
+                                streak_count = 1
+                            elif result == streak_type:
+                                streak_count += 1
+                            else:
+                                break
+                        if streak_type:
+                            streak_str = f"{streak_type}{streak_count}"
+                except Exception as e:
+                    # non-fatal: if streak calc fails, leave streak_str as default and continue
+                    print(f"Error fetching games for streak calculation for {team}: {e}")
+
+                # Build the standings entry (fall back to zeros if API didn't return records)
+                standings.append({
+                    'team': team,
+                    'conference_wins': conf.wins or 0 if conf else 0,
+                    'conference_losses': conf.losses or 0 if conf else 0,
+                    'total_wins': overall.wins or 0 if overall else 0,
+                    'total_losses': overall.losses or 0 if overall else 0,
+                    'conference_win_pct': (conf.wins / (conf.wins + conf.losses)) if (conf and (conf.wins + conf.losses) > 0) else 0,
+                    'overall_win_pct': (overall.wins / (overall.wins + overall.losses)) if (overall and (overall.wins + overall.losses) > 0) else 0,
+                    'streak': streak_str,
+                })
         except Exception as e:
             print(f"Error fetching record for {team}: {e}")
             standings.append({
@@ -805,6 +840,8 @@ def fetch_conference_standings(year=2025, conference="SEC"):
                 'total_wins': 0,
                 'total_losses': 0,
                 'conference_win_pct': 0,
+                'overall_win_pct': 0,
+                'streak': '0',
             })
 
     # Sort by: conference wins (desc), conference losses (asc), total wins (desc), team name (asc)
@@ -830,8 +867,3 @@ def fetch_conference_standings(year=2025, conference="SEC"):
                 entry['tied'] = False
 
     return standings
-
-
-
-
-

@@ -265,9 +265,10 @@ def conference_standings(request):
              if normalize_name(ppg_team) == normalize_name(entry['team'])),
             'N/A'
         )
-
-        # Debug check (optional)
-        print(entry["team"], "→", entry["ppg"])
+        try:
+            entry['logo'] = get_team_logo(entry['team'])
+        except Exception:
+            entry['logo'] = None
 
         # Highlight Oklahoma
         if normalize_name(entry['team']) == normalize_name(team):
