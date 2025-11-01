@@ -13,7 +13,7 @@
         }
 
         body {
-            background-color: #f5f5f5;
+            background-color: #f7f7f7;
             color: #1a1a1a;
         }
 
@@ -22,7 +22,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
         }
 
         .jumbotron {
@@ -31,17 +31,21 @@
 
         .card {
             border: none;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
             border-radius: 8px;
             background: white;
+            margin-bottom: 1rem;
         }
 
         .card-header {
-            background-color: white;
-            border-bottom: 2px solid #e5e5e5;
-            font-weight: 700;
-            font-size: 1.1rem;
-            padding: 1rem 1.25rem;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 0.75rem 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: #4b5563;
         }
 
         .table {
@@ -49,70 +53,108 @@
         }
 
         .table thead th {
-            background-color: #2d2d2d;
-            color: white;
+            background-color: #f8f9fa;
+            color: #6b7280;
             font-weight: 600;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            padding: 0.875rem 1rem;
-            border: none;
+            padding: 0.75rem 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+            border-top: none;
             white-space: nowrap;
         }
 
         .table tbody td {
-            padding: 1rem;
+            padding: 0.75rem;
             vertical-align: middle;
-            font-size: 0.95rem;
-            border-bottom: 1px solid #e5e5e5;
+            font-size: 0.875rem;
+            border-bottom: 1px solid #f3f4f6;
+            border-top: none;
         }
 
         .table tbody tr {
             background-color: white;
-            transition: background-color 0.2s ease;
+            transition: background-color 0.15s ease;
         }
 
         .table tbody tr:hover {
-            background-color: #f8f8f8;
+            background-color: #fafafa;
+        }
+
+        .table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* ESPN-style stat tables */
+        .stat-table {
+            font-size: 0.875rem;
+        }
+
+        .stat-table thead th {
+            background-color: #fff;
+            border-bottom: 2px solid #e5e7eb;
+            font-weight: 600;
+            padding: 0.5rem 0.75rem;
+        }
+
+        .stat-table tbody td {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .stat-table tbody tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        .stat-label {
+            font-weight: 600;
+            color: #374151;
         }
 
         .badge {
             font-weight: 600;
-            padding: 0.4rem 0.75rem;
-            font-size: 0.75rem;
+            padding: 0.35rem 0.65rem;
+            font-size: 0.7rem;
             letter-spacing: 0.5px;
             border-radius: 4px;
         }
 
         .bg-success {
-            background-color: #0d7c4d !important;
+            background-color: #059669 !important;
         }
 
         .bg-danger {
-            background-color: #d32f2f !important;
+            background-color: #dc2626 !important;
         }
 
         .bg-secondary {
-            background-color: #6c757d !important;
+            background-color: #6b7280 !important;
         }
 
         h2, h3, h4, h5 {
             font-weight: 700;
-            color: #1a1a1a;
+            color: #111827;
         }
 
         h2 {
-            font-size: 1.75rem;
-            margin-bottom: 1.25rem;
-            margin-top: 2rem;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
         }
 
         .btn-primary {
             background-color: #841617;
             border-color: #841617;
             font-weight: 600;
-            padding: 0.625rem 1.5rem;
+            padding: 0.5rem 1.25rem;
             transition: all 0.2s ease;
+            font-size: 0.875rem;
         }
 
         .btn-primary:hover {
@@ -122,16 +164,29 @@
             box-shadow: 0 4px 8px rgba(132, 22, 23, 0.3);
         }
 
+        .btn-secondary {
+            background-color: #6b7280;
+            border-color: #6b7280;
+            font-weight: 600;
+            padding: 0.5rem 1.25rem;
+            font-size: 0.875rem;
+        }
+
+        .btn-secondary:hover {
+            background-color: #4b5563;
+            border-color: #4b5563;
+        }
+
         .text-muted {
-            color: #6c757d !important;
-            font-size: 0.9em;
+            color: #6b7280 !important;
+            font-size: 0.875rem;
         }
 
         .list-group-item {
             border: none;
-            border-bottom: 1px solid #e5e5e5;
-            padding: 1rem 1.25rem;
-            font-size: 0.95rem;
+            border-bottom: 1px solid #f3f4f6;
+            padding: 0.875rem 1rem;
+            font-size: 0.875rem;
         }
 
         .list-group-item:last-child {
@@ -139,10 +194,80 @@
         }
 
         .list-group-item strong {
-            font-weight: 700;
-            color: #2d2d2d;
+            font-weight: 600;
+            color: #374151;
             display: inline-block;
             min-width: 90px;
+        }
+
+        /* Box score specific styles */
+        .scoreboard {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        .team-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .team-logo-lg {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+        }
+
+        .team-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .team-score {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .game-status {
+            text-align: center;
+            color: #6b7280;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .stat-comparison {
+            background: #fafafa;
+            border-radius: 6px;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .section-header {
+            background: #f8f9fa;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #374151;
+            margin-bottom: 0.75rem;
         }
     </style>
 </head>

@@ -201,30 +201,51 @@ def boxscore(request, game_id=None):
     team_names = team_stats.values_list("team__name", flat=True).distinct()
     player_stats_qs = PlayerStat.objects.filter(game=latest_game).select_related('player', 'player__team')
 
-    # Build nested structure: [{team: name, categories: [{name, types: [{name, athletes:[{name,stat}]}]}]}]
+    # Build ESPN-style structure: pivot by player so all stats appear in one row
+    # Structure: [{team, categories: [{name, stat_columns: [col names], players: [{name, stats: [values]}]}]}]
     from collections import OrderedDict
     teams_map = OrderedDict()
+
     for ps in player_stats_qs:
         team_name = ps.player.team.name if ps.player and ps.player.team else 'Unknown'
-        team_entry = teams_map.setdefault(team_name, OrderedDict())
-        cat_entry = team_entry.setdefault(ps.category or 'General', OrderedDict())
-        type_list = cat_entry.setdefault(ps.stat_type or 'Value', [])
-        type_list.append(ps)
+        player_name = ps.player.name if ps.player else ''
+        category = ps.category or 'General'
+        stat_type = ps.stat_type or 'Value'
+        stat_value = ps.stat
 
+        team_entry = teams_map.setdefault(team_name, OrderedDict())
+        cat_entry = team_entry.setdefault(category, {'stat_types': OrderedDict(), 'players': OrderedDict()})
+
+        # Track stat type order
+        if stat_type not in cat_entry['stat_types']:
+            cat_entry['stat_types'][stat_type] = len(cat_entry['stat_types'])
+
+        # Track player stats
+        player_entry = cat_entry['players'].setdefault(player_name, {})
+        player_entry[stat_type] = stat_value
+
+    # Convert to list format for template
     player_stats = []
     for team_name, categories in teams_map.items():
         team_obj = {'team': team_name, 'categories': []}
-        for cat, types_dict in categories.items():
-            cat_obj = {'name': prettify_stat_name(cat), 'types': []}
-            # types_dict is {stat_type: [PlayerStat,...]} but our grouping used lists per stat_type key
-            # However above we appended ps objects into a list keyed by stat_type via setdefault; need to regroup by stat_type
-            # types_dict currently is OrderedDict where keys are stat_type and values are lists of PlayerStat
-            for stat_type_name, stats_list in types_dict.items():
-                type_obj = {
-                    'name': prettify_stat_name(stat_type_name),
-                    'athletes': [{'name': s.player.name if s.player else '', 'stat': s.stat} for s in stats_list]
-                }
-                cat_obj['types'].append(type_obj)
+        for cat_name, cat_data in categories.items():
+            # Get stat column names in order
+            stat_columns = sorted(cat_data['stat_types'].items(), key=lambda x: x[1])
+            stat_column_names = [prettify_stat_name(col[0]) for col in stat_columns]
+            stat_column_keys = [col[0] for col in stat_columns]
+
+            # Build player rows with all stats
+            players = []
+            for player_name, player_stats_dict in cat_data['players'].items():
+                # Collect stats in correct column order
+                stats = [player_stats_dict.get(key, '-') for key in stat_column_keys]
+                players.append({'name': player_name, 'stats': stats})
+
+            cat_obj = {
+                'name': prettify_stat_name(cat_name),
+                'stat_columns': stat_column_names,
+                'players': players
+            }
             team_obj['categories'].append(cat_obj)
         player_stats.append(team_obj)
 

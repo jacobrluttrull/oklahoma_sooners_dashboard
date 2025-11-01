@@ -1,105 +1,541 @@
 {% extends "base.html" %}
 {% load stat_extras %}
 {% block content %}
-<div class="container mt-5 mb-5">
-<a href="{% url 'stats:home' %}">← Back to Dashboard</a>
 
+<style>
+  .boxscore-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem;
+  }
 
-  <!-- ===== GAME HEADER / SCOREBOARD ===== -->
-  <div class="card shadow-sm mb-5">
-    <div class="card-body text-center">
-      <div class="row align-items-center">
-        <div class="col-md-5 text-end">
-            <img src="{{ away_logo }}" alt="{{ latest_game.away_team }} Logo" class="img-fluid mb-2" style="max-height: 80px;">
+  .back-link {
+    color: #841617;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
 
-          <h3 class="fw-bold text-uppercase text-secondary">{{ latest_game.away_team }}</h3>
-          <h2 class="display-5 fw-bold text-dark">{{ latest_game.away_points }}</h2>
-        </div>
-        <div class="col-md-2">
-          <h5 class="fw-semibold text-muted">FINAL</h5>
-          <p class="text-muted small mb-0">{{ latest_game.start_date|date:"F j, Y" }}</p>
-        </div>
-        <div class="col-md-5 text-start">
-            <img src="{{ home_logo }}" alt="{{ latest_game.home_team }} Logo" class="img-fluid mb-2" style="max-height: 80px;">
-          <h3 class="fw-bold text-uppercase text-danger">{{ latest_game.home_team }}</h3>
-          <h2 class="display-5 fw-bold text-dark">{{ latest_game.home_points }}</h2>
-        </div>
+  .back-link:hover {
+    color: #6b1213;
+    text-decoration: underline;
+  }
+
+  .scoreboard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2rem 1.5rem;
+    gap: 2rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+  }
+
+  .team-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+  }
+
+  .team-box.away {
+    justify-content: flex-start;
+  }
+
+  .team-box.home {
+    justify-content: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  .team-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .team-box.home .team-info {
+    align-items: flex-end;
+  }
+
+  .team-logo-box {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .team-logo-box img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .team-name-box {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 0.25rem;
+  }
+
+  .team-record {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .team-score-box {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1;
+  }
+
+  .game-info-box {
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .game-status-box {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 0.25rem;
+  }
+
+  .game-date-box {
+    font-size: 0.75rem;
+    color: #6b7280;
+  }
+
+  .stats-section {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .team-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  .team-column h4 {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .stat-table-clean {
+    width: 100%;
+    font-size: 0.8125rem;
+  }
+
+  .stat-table-clean thead th {
+    background: #f9fafb;
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.5rem 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: center;
+  }
+
+  .stat-table-clean thead th:first-child {
+    text-align: left;
+  }
+
+  .stat-table-clean tbody td {
+    padding: 0.5rem 0.5rem;
+    border-bottom: 1px solid #f3f4f6;
+    text-align: center;
+  }
+
+  .stat-table-clean tbody td:first-child {
+    text-align: left;
+    font-weight: 500;
+    color: #111827;
+  }
+
+  .stat-table-clean tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .stat-table-clean tbody tr:hover {
+    background-color: #fafafa;
+  }
+
+  .stat-table-clean tbody tr.total-row {
+    background-color: #f9fafb;
+    font-weight: 600;
+  }
+
+  .stat-table-clean tbody tr.total-row:hover {
+    background-color: #f3f4f6;
+  }
+
+  .category-section {
+    margin-bottom: 2rem;
+  }
+
+  .category-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .category-header {
+    background: #f8f9fa;
+    color: #374151;
+    padding: 0.625rem 1rem;
+    border-radius: 0;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0;
+    border-left: 4px solid #841617;
+  }
+
+  /* ESPN-style player stats table with all stats in one row */
+  .player-stats-table {
+    width: 100%;
+    font-size: 0.8125rem;
+    border-collapse: collapse;
+  }
+
+  .player-stats-table thead th {
+    background: #f9fafb;
+    color: #6b7280;
+    font-weight: 600;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.625rem 0.5rem;
+    border-bottom: 2px solid #e5e7eb;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .player-stats-table thead th:first-child {
+    text-align: left;
+    padding-left: 1rem;
+  }
+
+  .player-stats-table tbody td {
+    padding: 0.625rem 0.5rem;
+    border-bottom: 1px solid #f3f4f6;
+    text-align: center;
+    color: #374151;
+  }
+
+  .player-stats-table tbody td:first-child {
+    text-align: left;
+    font-weight: 500;
+    color: #111827;
+    padding-left: 1rem;
+  }
+
+  .player-stats-table tbody tr:hover {
+    background-color: #fafafa;
+  }
+
+  .player-stats-table tbody tr.total-row {
+    background-color: #f9fafb;
+    font-weight: 600;
+    border-top: 2px solid #e5e7eb;
+  }
+
+  .player-stats-table tbody tr.total-row td {
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .player-stats-table tbody tr.total-row:hover {
+    background-color: #f3f4f6;
+  }
+
+  /* Two column layout for team comparison */
+  .team-comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .team-stat-section {
+    background: white;
+  }
+
+  .team-stat-header {
+    background: #f8f9fa;
+    padding: 0.75rem 1rem;
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: #111827;
+    border-bottom: 2px solid #e5e7eb;
+    border-left: 4px solid #841617;
+  }
+
+  /* Responsive breakpoints for optimal viewing at all sizes */
+  @media (max-width: 1400px) {
+    .boxscore-container {
+      max-width: 100%;
+      padding: 1.25rem 1rem;
+    }
+  }
+
+  @media (max-width: 1200px) {
+    .player-stats-table {
+      font-size: 0.75rem;
+    }
+
+    .player-stats-table thead th,
+    .player-stats-table tbody td {
+      padding: 0.5rem 0.375rem;
+    }
+
+    .player-stats-table thead th:first-child,
+    .player-stats-table tbody td:first-child {
+      padding-left: 0.75rem;
+    }
+
+    .team-comparison-grid {
+      gap: 1.25rem;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .team-comparison-grid {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .scoreboard {
+      padding: 1.5rem 1rem;
+    }
+
+    .team-score-box {
+      font-size: 2.5rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .scoreboard {
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1.25rem 1rem;
+    }
+
+    .team-box {
+      width: 100%;
+      justify-content: space-between !important;
+    }
+
+    .team-box.home {
+      flex-direction: row !important;
+    }
+
+    .team-box.home .team-info {
+      align-items: flex-start !important;
+    }
+
+    .team-columns {
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+
+    .stats-section {
+      padding: 1rem 0.75rem;
+    }
+
+    .team-score-box {
+      font-size: 2rem;
+    }
+
+    .team-name-box {
+      font-size: 1rem;
+    }
+
+    /* Ensure tables scroll horizontally on mobile */
+    .table-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .player-stats-table {
+      font-size: 0.7rem;
+      min-width: 600px; /* Ensure table doesn't collapse too much */
+    }
+
+    .player-stats-table thead th,
+    .player-stats-table tbody td {
+      padding: 0.45rem 0.3rem;
+    }
+
+    .player-stats-table thead th:first-child,
+    .player-stats-table tbody td:first-child {
+      padding-left: 0.5rem;
+      position: sticky;
+      left: 0;
+      background: #fff;
+      z-index: 1;
+    }
+
+    .player-stats-table thead th:first-child {
+      background: #f9fafb;
+    }
+
+    .player-stats-table tbody tr.total-row td:first-child {
+      background: #f9fafb;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .boxscore-container {
+      padding: 1rem 0.5rem;
+    }
+
+    .stats-section {
+      padding: 0.75rem 0.5rem;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+    }
+
+    .team-logo-box {
+      width: 48px;
+      height: 48px;
+    }
+
+    .game-info-box {
+      min-width: 80px;
+    }
+
+    .player-stats-table {
+      font-size: 0.65rem;
+    }
+  }
+</style>
+
+<div class="boxscore-container">
+  <a href="{% url 'stats:home' %}" class="back-link">
+    ← Back to Dashboard
+  </a>
+
+  <!-- SCOREBOARD -->
+  <div class="scoreboard">
+    <div class="team-box away">
+      <div class="team-logo-box">
+        <img src="{{ away_logo }}" alt="{{ latest_game.away_team }}" onerror="this.style.display='none'">
       </div>
+      <div class="team-info">
+        <div class="team-name-box">{{ latest_game.away_team }}</div>
+        <div class="team-record">{{ latest_game.away_record|default:"" }}</div>
+      </div>
+      <div class="team-score-box">{{ latest_game.away_points }}</div>
+    </div>
+
+    <div class="game-info-box">
+      <div class="game-status-box">FINAL</div>
+      <div class="game-date-box">{{ latest_game.start_date|date:"M j, Y" }}</div>
+    </div>
+
+    <div class="team-box home">
+      <div class="team-logo-box">
+        <img src="{{ home_logo }}" alt="{{ latest_game.home_team }}" onerror="this.style.display='none'">
+      </div>
+      <div class="team-info">
+        <div class="team-name-box">{{ latest_game.home_team }}</div>
+        <div class="team-record">{{ latest_game.home_record|default:"" }}</div>
+      </div>
+      <div class="team-score-box">{{ latest_game.home_points }}</div>
     </div>
   </div>
 
-<!-- ===== TEAM STATS (Readable & Styled) ===== -->
-{% if team_stats %}
-<div class="card shadow-sm mb-5">
-  <div class="card-body">
-    <h4 class="card-title text-center mb-4 text-primary fw-semibold">
-      Team Stats Comparison
-    </h4>
-
-    <div class="row">
+  <!-- TEAM STATS COMPARISON -->
+  {% if team_stats %}
+  <div class="stats-section">
+    <div class="section-title">Team Stats</div>
+    <div class="team-columns">
       {% for team_name in team_names %}
-        <div class="col-md-6 mb-4">
-          <div class="border rounded-3 p-4 bg-light h-100">
-            <h5 class="fw-bold text-center text-uppercase text-danger mb-3">
-              {{ team_name }}
-            </h5>
-            {% for stat in team_stats %}
-              {% if stat.team.name == team_name %}
-                <div class="d-flex justify-content-between border-bottom py-2">
-                  <span class="fw-semibold text-muted">{{ stat.category|prettify }}</span>
-                  <span class="fw-bold text-dark">{{ stat.stat }}</span>
-                </div>
-              {% endif %}
-            {% endfor %}
-          </div>
+        <div class="team-column">
+          <h4>{{ team_name }}</h4>
+          <table class="stat-table-clean">
+            <tbody>
+              {% for stat in team_stats %}
+                {% if stat.team.name == team_name %}
+                  <tr>
+                    <td>{{ stat.category|prettify }}</td>
+                    <td style="font-weight: 600;">{{ stat.stat }}</td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       {% endfor %}
     </div>
   </div>
-</div>
-{% endif %}
+  {% endif %}
 
-
-
-
-
-
-  <!-- ===== PLAYER STATS ===== -->
+  <!-- PLAYER STATS - ESPN STYLE (All stats per player in one row) -->
   {% if player_stats %}
-    {% for team in player_stats %}
-      <h3 class="fw-bold text-center my-5 text-uppercase">{{ team.team }}</h3>
+    <div class="team-comparison-grid">
+      {% for team in player_stats %}
+        <div class="team-stat-section">
+          <div class="team-stat-header">{{ team.team }}</div>
 
-      {% for category in team.categories %}
-      <div class="card shadow-sm mb-4">
-        <div class="card-header bg-gradient text-white text-center fw-bold text-uppercase"
-             style="background: linear-gradient(90deg, #841617 0%, #a83232 100%);">
-          {{ category.name|prettify }}
-        </div>
-        <div class="card-body">
-          {% for stat_type in category.types %}
-            <div class="table-responsive mb-4">
-              <table class="table table-sm table-hover align-middle text-center">
-                <thead class="table-light">
-                  <tr class="table-secondary">
-                    <th scope="col" class="text-start ps-3">Player</th>
-                    <th scope="col">{{ stat_type.name|prettify }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for athlete in stat_type.athletes %}
+          {% for category in team.categories %}
+            <div class="category-section">
+              <div class="category-header">{{ category.name }}</div>
+
+              <div class="table-responsive">
+                <table class="player-stats-table">
+                  <thead>
                     <tr>
-                      <td class="text-start ps-3">{{ athlete.name }}</td>
-                      <td class="fw-semibold">{{ athlete.stat }}</td>
+                      <th></th>
+                      {% for column in category.stat_columns %}
+                        <th>{{ column }}</th>
+                      {% endfor %}
                     </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {% for player in category.players %}
+                      <tr {% if player.name == "TEAM" %}class="total-row"{% endif %}>
+                        <td>{{ player.name }}</td>
+                        {% for stat in player.stats %}
+                          <td>{{ stat }}</td>
+                        {% endfor %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
           {% endfor %}
         </div>
-      </div>
       {% endfor %}
-    {% endfor %}
+    </div>
   {% endif %}
 
 </div>
