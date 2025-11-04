@@ -33,8 +33,6 @@ def get_api_client():
 # NORMALIZATION
 # =========================
 
-import html
-
 def normalize_name(name: str) -> str:
     if not name:
         return ""
@@ -867,3 +865,4 @@ def fetch_conference_standings(year=2025, conference="SEC"):
                 entry['tied'] = False
 
     return standings
+

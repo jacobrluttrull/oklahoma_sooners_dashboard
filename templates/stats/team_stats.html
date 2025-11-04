@@ -443,19 +443,33 @@
 
     <!-- Summary Cards -->
     <div class="summary-cards">
-        {% if oklahoma_ppg %}
         <div class="summary-card">
             <div class="summary-card-icon">🏈</div>
             <div class="summary-card-value">{{ oklahoma_ppg }}</div>
             <div class="summary-card-label">Points Per Game</div>
-            {% if oklahoma_total_points %}
-            <div class="summary-card-trend neutral">{{ oklahoma_total_points }} total points</div>
-            {% else %}
-            <div class="summary-card-trend neutral">Offense</div>
-            {% endif %}
+            <div class="summary-card-trend neutral">{{ oklahoma_total_points }} total points in {{ oklahoma_games }} games</div>
         </div>
-        {% endif %}
-        <!-- Additional summary cards will be populated from backend context -->
+
+        <div class="summary-card">
+            <div class="summary-card-icon">🇺🇸</div>
+            <div class="summary-card-value">#{{ oklahoma_national_rank }}</div>
+            <div class="summary-card-label">National Rank (PPG)</div>
+            <div class="summary-card-trend neutral">out of {{ oklahoma_national_total }} teams</div>
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-card-icon">🏆</div>
+            <div class="summary-card-value">#{{ oklahoma_sec_rank }}</div>
+            <div class="summary-card-label">SEC Rank (PPG)</div>
+            <div class="summary-card-trend neutral">out of {{ oklahoma_sec_total }} teams</div>
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-card-icon">📊</div>
+            <div class="summary-card-value">{{ oklahoma_games }}</div>
+            <div class="summary-card-label">Games Played</div>
+            <div class="summary-card-trend neutral">2025 Season</div>
+        </div>
     </div>
 
     <!-- Navigation/Filter Tabs -->
@@ -475,16 +489,50 @@
         </div>
 
         <div class="stats-grid">
-            <!-- Offensive stat items will be populated from backend context -->
-            {% if oklahoma_ppg %}
             <div class="stat-item">
                 <div class="stat-label">Points Per Game</div>
                 <div class="stat-value-container">
                     <span class="stat-value">{{ oklahoma_ppg }}</span>
                     <span class="stat-secondary">PPG</span>
                 </div>
+                <div class="stat-comparison">
+                    <span class="stat-badge neutral">SEC: #{{ oklahoma_sec_rank }}/{{ oklahoma_sec_total }}</span>
+                    <span class="stat-badge neutral">National: #{{ oklahoma_national_rank }}/{{ oklahoma_national_total }}</span>
+                </div>
             </div>
-            {% endif %}
+
+            <div class="stat-item">
+                <div class="stat-label">Total Points Scored</div>
+                <div class="stat-value-container">
+                    <span class="stat-value">{{ oklahoma_total_points }}</span>
+                    <span class="stat-secondary">points</span>
+                </div>
+                <div class="stat-secondary" style="margin-top: 0.5rem;">
+                    In {{ oklahoma_games }} games played
+                </div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-label">SEC Scoring Rank</div>
+                <div class="stat-value-container">
+                    <span class="stat-value">#{{ oklahoma_sec_rank }}</span>
+                    <span class="stat-secondary">of {{ oklahoma_sec_total }}</span>
+                </div>
+                <div class="stat-progress">
+                    <div class="stat-progress-bar" style="width: {{ oklahoma_sec_rank|percentile:oklahoma_sec_total }}%;"></div>
+                </div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-label">National Scoring Rank</div>
+                <div class="stat-value-container">
+                    <span class="stat-value">#{{ oklahoma_national_rank }}</span>
+                    <span class="stat-secondary">of {{ oklahoma_national_total }}</span>
+                </div>
+                <div class="stat-progress">
+                    <div class="stat-progress-bar" style="width: {{ oklahoma_national_rank|percentile:oklahoma_national_total }}%;"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Detailed Offensive Table -->
@@ -499,16 +547,20 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Table rows will be populated from backend context -->
-                {% if oklahoma_ppg %}
                 <tr>
                     <td class="stat-name">Points Per Game</td>
                     <td class="total-column">{{ oklahoma_total_points }}</td>
                     <td>{{ oklahoma_ppg }}</td>
+                    <td class="rank-cell">#{{ oklahoma_sec_rank }}</td>
+                    <td class="rank-cell">#{{ oklahoma_national_rank }}</td>
+                </tr>
+                <tr>
+                    <td class="stat-name">Total Points</td>
+                    <td class="total-column">{{ oklahoma_total_points }}</td>
+                    <td>—</td>
                     <td class="rank-cell">—</td>
                     <td class="rank-cell">—</td>
                 </tr>
-                {% endif %}
             </tbody>
         </table>
     </div>

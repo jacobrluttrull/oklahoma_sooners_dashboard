@@ -13,10 +13,11 @@ from .cfb_api import (
     fetch_latest_victory,
     fetch_player_stats,
     fetch_and_cache_schedule,
-    ensure_team_logo, fetch_conference_standings,
-    get_team_ppg# added: ensure logos are fetched when missing
+    ensure_team_logo,
+    fetch_conference_standings,
+    get_team_ppg  # API-based PPG for conference standings
 )
-from team_stats_util import get_oklahoma_ppg
+from team_stats_util import get_oklahoma_ppg, get_all_team_ppg, get_oklahoma_ppg_rankings
 
 
 # home view
@@ -263,10 +264,15 @@ def boxscore(request, game_id=None):
 
 def team_stats(request):
     """This will display the current team stats page with averages, total values, and rankings among SEC and FBS teams. """
-    avg_ppg, total_points = get_oklahoma_ppg()
+    rankings = get_oklahoma_ppg_rankings(year=2025)
     context = {
-        "oklahoma_ppg": avg_ppg,
-        "oklahoma_total_points": total_points,
+        "oklahoma_ppg": rankings['ppg'],
+        "oklahoma_total_points": rankings['total_points'],
+        "oklahoma_games": rankings['games'],
+        "oklahoma_national_rank": rankings['national_rank'],
+        "oklahoma_national_total": rankings['national_total_teams'],
+        "oklahoma_sec_rank": rankings['sec_rank'],
+        "oklahoma_sec_total": rankings['sec_total_teams'],
     }
 
     return render(request, "stats/team_stats.html", context)
