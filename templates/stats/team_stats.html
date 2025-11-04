@@ -1,7 +1,644 @@
 {% extends "base.html" %}
+{% load stat_extras %}
+
 {% block content %}
-<div class="container mt-5">
-  <h1 class="text-center">Team Stats Page</h1>
-  <p class="text-center text-muted">Coming soon...</p>
+<style>
+    /* Team Stats Page Specific Styles */
+    .stats-hero {
+        background: linear-gradient(135deg, #841617 0%, #6b1213 100%);
+        color: white;
+        padding: 3rem 0;
+        margin-bottom: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(132, 22, 23, 0.3);
+        position: relative;
+    }
+
+    .stats-hero h1 {
+        color: white;
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+
+    .stats-hero p {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 1.1rem;
+        margin-bottom: 0;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        color: rgba(255, 255, 255, 0.9);
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 1rem;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        transition: all 0.2s ease;
+        backdrop-filter: blur(10px);
+    }
+
+    .back-link:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        transform: translateX(-3px);
+    }
+
+    .stat-category-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .stat-category-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+
+    .category-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #841617;
+    }
+
+    .category-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #841617 0%, #6b1213 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+
+    .category-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #111827;
+        margin: 0;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-item {
+        background: #f9fafb;
+        border-radius: 8px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.2s ease;
+    }
+
+    .stat-item:hover {
+        background: #f3f4f6;
+        transform: scale(1.02);
+    }
+
+    .stat-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 4px;
+        background: linear-gradient(180deg, #841617 0%, #6b1213 100%);
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-value-container {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1;
+    }
+
+    .stat-secondary {
+        font-size: 0.875rem;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .stat-comparison {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+    }
+
+    .stat-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+
+    .stat-badge.positive {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .stat-badge.negative {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .stat-badge.neutral {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
+
+    /* Progress bar for visual stats */
+    .stat-progress {
+        width: 100%;
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+    }
+
+    .stat-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #841617 0%, #6b1213 100%);
+        border-radius: 4px;
+        transition: width 0.6s ease;
+    }
+
+    /* Table styles for detailed stats */
+    .detailed-stats-table {
+        width: 100%;
+        font-size: 0.875rem;
+        margin-top: 1rem;
+    }
+
+    .detailed-stats-table thead th {
+        background: #f9fafb;
+        color: #6b7280;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 0.75rem;
+        border-bottom: 2px solid #e5e7eb;
+        text-align: left;
+    }
+
+    .detailed-stats-table tbody td {
+        padding: 0.875rem 0.75rem;
+        border-bottom: 1px solid #f3f4f6;
+        color: #374151;
+    }
+
+    .detailed-stats-table tbody tr:hover {
+        background: #fafafa;
+    }
+
+    .detailed-stats-table .stat-name {
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .detailed-stats-table .rank-cell {
+        font-weight: 700;
+        color: #841617;
+    }
+
+    /* Comparison bars */
+    .comparison-bar-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .comparison-bar {
+        flex: 1;
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 3px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .comparison-bar-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        background: #841617;
+        border-radius: 3px;
+        transition: width 0.6s ease;
+    }
+
+    .comparison-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        min-width: 60px;
+        text-align: right;
+    }
+
+    /* Filter/Tab Navigation */
+    .stats-nav {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+    }
+
+    .stats-nav-btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        background: #f3f4f6;
+        color: #6b7280;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .stats-nav-btn:hover {
+        background: #e5e7eb;
+        color: #374151;
+    }
+
+    .stats-nav-btn.active {
+        background: #841617;
+        color: white;
+    }
+
+    /* Summary Cards at Top */
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .summary-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.25rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .summary-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        transform: translateY(-3px);
+    }
+
+    .summary-card-icon {
+        width: 50px;
+        height: 50px;
+        margin: 0 auto 0.75rem;
+        background: linear-gradient(135deg, #841617 0%, #6b1213 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .summary-card-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #111827;
+        margin-bottom: 0.25rem;
+    }
+
+    .summary-card-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .summary-card-trend {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .summary-card-trend.up {
+        color: #059669;
+    }
+
+    .summary-card-trend.down {
+        color: #dc2626;
+    }
+
+    /* Chart placeholder styles */
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chart-header {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+
+    .chart-placeholder {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f9fafb;
+        border-radius: 8px;
+        border: 2px dashed #d1d5db;
+        color: #6b7280;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .stats-hero h1 {
+            font-size: 1.75rem;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .summary-cards {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+
+<div class="container mt-4">
+    <!-- Hero Section -->
+    <div class="stats-hero">
+        <div class="container">
+            <a href="{% url 'stats:home' %}" class="back-link">
+                ← Back to Dashboard
+            </a>
+            <div class="text-center">
+                <h1>2025 Oklahoma Sooners Team Statistics</h1>
+                <p>Complete statistical breakdown and performance metrics</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+        {% if oklahoma_ppg %}
+        <div class="summary-card">
+            <div class="summary-card-icon">🏈</div>
+            <div class="summary-card-value">{{ oklahoma_ppg }}</div>
+            <div class="summary-card-label">Points Per Game</div>
+            {% if oklahoma_total_points %}
+            <div class="summary-card-trend neutral">{{ oklahoma_total_points }} total points</div>
+            {% else %}
+            <div class="summary-card-trend neutral">Offense</div>
+            {% endif %}
+        </div>
+        {% endif %}
+        <!-- Additional summary cards will be populated from backend context -->
+    </div>
+
+    <!-- Navigation/Filter Tabs -->
+    <div class="stats-nav">
+        <button class="stats-nav-btn active" onclick="showCategory('all')">All Stats</button>
+        <button class="stats-nav-btn" onclick="showCategory('offense')">Offense</button>
+        <button class="stats-nav-btn" onclick="showCategory('defense')">Defense</button>
+        <button class="stats-nav-btn" onclick="showCategory('special')">Special Teams</button>
+        <button class="stats-nav-btn" onclick="showCategory('advanced')">Advanced Metrics</button>
+    </div>
+
+    <!-- Offensive Stats Category -->
+    <div class="stat-category-card" data-category="offense">
+        <div class="category-header">
+            <div class="category-icon">🏈</div>
+            <h2 class="category-title">Offensive Statistics</h2>
+        </div>
+
+        <div class="stats-grid">
+            <!-- Offensive stat items will be populated from backend context -->
+            {% if oklahoma_ppg %}
+            <div class="stat-item">
+                <div class="stat-label">Points Per Game</div>
+                <div class="stat-value-container">
+                    <span class="stat-value">{{ oklahoma_ppg }}</span>
+                    <span class="stat-secondary">PPG</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Detailed Offensive Table -->
+        <table class="detailed-stats-table">
+            <thead>
+                <tr>
+                    <th>Stat Category</th>
+                    <th class="total-column">Total</th>
+                    <th>Per Game</th>
+                    <th>SEC Rank</th>
+                    <th>National Rank</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Table rows will be populated from backend context -->
+                {% if oklahoma_ppg %}
+                <tr>
+                    <td class="stat-name">Points Per Game</td>
+                    <td class="total-column">{{ oklahoma_total_points }}</td>
+                    <td>{{ oklahoma_ppg }}</td>
+                    <td class="rank-cell">—</td>
+                    <td class="rank-cell">—</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Defensive Stats Category -->
+    <div class="stat-category-card" data-category="defense">
+        <div class="category-header">
+            <div class="category-icon">🛡️</div>
+            <h2 class="category-title">Defensive Statistics</h2>
+        </div>
+
+        <div class="stats-grid">
+            <!-- Defensive stat items will be populated from backend context -->
+        </div>
+
+        <!-- Detailed Defensive Table -->
+        <table class="detailed-stats-table">
+            <thead>
+                <tr>
+                    <th>Stat Category</th>
+                    <th class="total-column">Total</th>
+                    <th>Per Game</th>
+                    <th>SEC Rank</th>
+                    <th>National Rank</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Table rows will be populated from backend context -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Special Teams Category -->
+    <div class="stat-category-card" data-category="special">
+        <div class="category-header">
+            <div class="category-icon">⚡</div>
+            <h2 class="category-title">Special Teams</h2>
+        </div>
+
+        <div class="stats-grid">
+            <!-- Special teams stat items will be populated from backend context -->
+        </div>
+    </div>
+
+    <!-- Turnover & Penalties Category -->
+    <div class="stat-category-card" data-category="advanced">
+        <div class="category-header">
+            <div class="category-icon">📈</div>
+            <h2 class="category-title">Turnovers & Discipline</h2>
+        </div>
+
+        <div class="stats-grid">
+            <!-- Advanced metric stat items will be populated from backend context -->
+        </div>
+    </div>
+
+    <!-- Visualization Charts Placeholder -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <div class="chart-header">Yards Per Game Trend</div>
+                <div class="chart-placeholder">
+                    📊 Chart visualization ready for integration<br>
+                    (Chart.js, D3.js, or similar library can be added)
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-container">
+                <div class="chart-header">Offensive vs Defensive Performance</div>
+                <div class="chart-placeholder">
+                    📈 Chart visualization ready for integration<br>
+                    (Radar chart showing offensive/defensive balance)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="chart-container">
+                <div class="chart-header">Season Progression: Points Scored vs Allowed</div>
+                <div class="chart-placeholder">
+                    📉 Chart visualization ready for integration<br>
+                    (Line chart showing weekly scoring trends)
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    // Category filtering
+    function showCategory(category) {
+        const cards = document.querySelectorAll('.stat-category-card');
+        const buttons = document.querySelectorAll('.stats-nav-btn');
+
+        // Update active button
+        buttons.forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // Show/hide cards
+        cards.forEach(card => {
+            if (category === 'all') {
+                card.style.display = 'block';
+            } else {
+                const cardCategory = card.getAttribute('data-category');
+                card.style.display = cardCategory === category ? 'block' : 'none';
+            }
+        });
+    }
+
+
+
+    // Animate progress bars on scroll
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.stat-category-card').forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'all 0.5s ease';
+        observer.observe(card);
+    });
+</script>
+
 {% endblock %}

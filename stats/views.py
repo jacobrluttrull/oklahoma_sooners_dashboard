@@ -16,6 +16,7 @@ from .cfb_api import (
     ensure_team_logo, fetch_conference_standings,
     get_team_ppg# added: ensure logos are fetched when missing
 )
+from team_stats_util import get_oklahoma_ppg
 
 
 # home view
@@ -262,9 +263,13 @@ def boxscore(request, game_id=None):
 
 def team_stats(request):
     """This will display the current team stats page with averages, total values, and rankings among SEC and FBS teams. """
+    avg_ppg, total_points = get_oklahoma_ppg()
+    context = {
+        "oklahoma_ppg": avg_ppg,
+        "oklahoma_total_points": total_points,
+    }
 
-
-    return render(request, "stats/team_stats.html", {})
+    return render(request, "stats/team_stats.html", context)
 
 
 def conference_standings(request):
