@@ -114,7 +114,7 @@ class Command(BaseCommand):
                             away_team.conference = g.away_conference or ''
                             away_team.save()
 
-                        # Prepare game data
+                        # Prepare game data using normalized fields only
                         defaults = {
                             'season': getattr(g, 'season', year),
                             'week': getattr(g, 'week', None),
@@ -130,21 +130,9 @@ class Command(BaseCommand):
                             'date': g.start_date.date() if hasattr(g, 'start_date') else None,
                             'cfbd_game_id': cfbd_id,
                         }
-
-                        # Handle Oklahoma-specific fields if Oklahoma is involved
-                        if g.home_team == 'Oklahoma':
-                            defaults['opponent'] = away_team
-                            defaults['home_away'] = 'H'
-                            defaults['oklahoma_score'] = g.home_points
-                            defaults['opponent_score'] = g.away_points
-                        elif g.away_team == 'Oklahoma':
-                            defaults['opponent'] = home_team
-                            defaults['home_away'] = 'A'
-                            defaults['oklahoma_score'] = g.away_points
-                            defaults['opponent_score'] = g.home_points
-                        else:
-                            # For non-Oklahoma games, set opponent to away_team (arbitrary choice for FK constraint)
-                            defaults['opponent'] = away_team
+                        # Note: We no longer populate Oklahoma-centric fields (opponent, home_away,
+                        # oklahoma_score, opponent_score, result). Use Game.get_opponent(),
+                        # get_score_for_team(), etc. instead.
 
                         # Create game (we already checked for duplicates above)
                         try:

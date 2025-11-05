@@ -23,9 +23,25 @@ SEC_TEAMS = [
 # CFBD CONFIGURATION
 # =========================
 def get_api_client():
-    configuration = cfbd.Configuration(
-        access_token=os.environ.get("BEARER_TOKEN")
-    )
+    """
+    Creates and returns a CFBD API client with authentication.
+
+    Returns:
+        cfbd.ApiClient: Configured API client
+
+    Raises:
+        ValueError: If BEARER_TOKEN environment variable is not set
+    """
+    bearer_token = os.environ.get("BEARER_TOKEN")
+
+    if not bearer_token:
+        raise ValueError(
+            "BEARER_TOKEN environment variable is required! "
+            "Get your API key from https://collegefootballdata.com/key and set it with: "
+            "setx BEARER_TOKEN \"your_token_here\" (Windows) or export BEARER_TOKEN=\"your_token_here\" (Mac/Linux)"
+        )
+
+    configuration = cfbd.Configuration(access_token=bearer_token)
     return cfbd.ApiClient(configuration)
 
 
@@ -512,9 +528,17 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
         if (timezone.now() - last_update) < timedelta(days=1):
             print("Using cached schedule from database")
 
+            # Determine team name string for helper methods
+            team_name = team_obj.name if team_obj else team
+
             schedule = []
             for g in recent_games.order_by("date"):
-                opponent = g.opponent.name
+                # Use helper methods to get opponent and scores
+                opponent_obj = g.get_opponent(team_name)
+                if not opponent_obj:
+                    continue  # Skip if this game doesn't involve the requested team
+
+                opponent = opponent_obj.name
                 opponent_key = normalize_name(opponent)
                 opponent_rank = None
                 is_ranked = False
@@ -522,19 +546,26 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
                     is_ranked = True
 
+                team_score = g.get_score_for_team(team_name)
+                opponent_score = g.get_score_for_team(opponent)
                 score_str = (
-                    f"{g.oklahoma_score} - {g.opponent_score}"
-                    if g.oklahoma_score is not None and g.opponent_score is not None
+                    f"{team_score} - {opponent_score}"
+                    if team_score is not None and opponent_score is not None
                     else "TBD"
                 )
 
+                location = g.get_location_for_team(team_name)
+                location_display = "Home" if location == "H" else ("Neutral" if location == "N" else "Away")
+
+                result = g.get_result_for_team(team_name) or ""
+
                 schedule.append({
-                    "id": g.id,  # Add the game ID for clickable links
+                    "id": g.id,
                     "date": g.date,
                     "opponent": opponent,
-                    "location": "Home" if g.home_away == "H" else ("Neutral" if g.home_away == "N" else "Away"),
+                    "location": location_display,
                     "score": score_str,
-                    "result": g.result,
+                    "result": result,
                     "is_ranked": is_ranked,
                     "opponent_rank": opponent_rank,
                 })
@@ -566,35 +597,7 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                 home_team_obj, _ = Team.objects.get_or_create(name=g.home_team)
                 away_team_obj, _ = Team.objects.get_or_create(name=g.away_team)
 
-                # Oklahoma-centric fields
-                if g.home_team == team or (team_obj and home_team_obj == team_obj):
-                    opponent_name = g.away_team
-                    is_home = True
-                    oklahoma_score = g.home_points
-                    opponent_score = g.away_points
-                else:
-                    opponent_name = g.home_team
-                    is_home = False
-                    oklahoma_score = g.away_points
-                    opponent_score = g.home_points
-
-                # Determine W/L result
-                result = ""
-                if g.home_points is not None and g.away_points is not None:
-                    result = "W" if (oklahoma_score or 0) > (opponent_score or 0) else "L"
-
-                # Determine ranking info
-                week_num = getattr(g, "week", None)
-                opponent_key = normalize_name(opponent_name)
-                opponent_rank = None
-                is_ranked = False
-                if week_num in rankings_map and opponent_key in rankings_map[week_num]:
-                    opponent_rank = rankings_map[week_num][opponent_key]
-                    is_ranked = True
-                elif latest_week_with_rank and opponent_key in rankings_map.get(latest_week_with_rank, {}):
-                    opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
-                    is_ranked = True
-
+                # Store game using normalized fields only
                 cfbd_id = getattr(g, "id", None)
                 defaults = {
                     'season': getattr(g, 'season', None),
@@ -608,11 +611,6 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
                     'away_points': getattr(g, 'away_points', None),
                     'venue': getattr(g, 'venue', ''),
                     'attendance': getattr(g, 'attendance', None),
-                    'home_away': 'H' if is_home else ('N' if bool(getattr(g, 'neutral_site', False)) else 'A'),
-                    'oklahoma_score': oklahoma_score,
-                    'opponent_score': opponent_score,
-                    'result': result,
-                    'opponent': away_team_obj if is_home else home_team_obj,
                     'date': g.start_date.date(),
                 }
 
@@ -624,17 +622,46 @@ def fetch_and_cache_schedule(year, team, rankings_map, latest_week_with_rank):
 
                 game, _ = Game.objects.update_or_create(defaults=defaults, **lookup)
 
+                # Determine team name string for helper methods
+                team_name = team_obj.name if team_obj else team
+
+                # Use helper methods to build schedule entry
+                opponent_obj = game.get_opponent(team_name)
+                if not opponent_obj:
+                    continue  # Skip if this game doesn't involve the requested team
+
+                opponent_name = opponent_obj.name
+                opponent_key = normalize_name(opponent_name)
+
+                # Determine ranking info
+                week_num = getattr(g, "week", None)
+                opponent_rank = None
+                is_ranked = False
+                if week_num in rankings_map and opponent_key in rankings_map[week_num]:
+                    opponent_rank = rankings_map[week_num][opponent_key]
+                    is_ranked = True
+                elif latest_week_with_rank and opponent_key in rankings_map.get(latest_week_with_rank, {}):
+                    opponent_rank = rankings_map[latest_week_with_rank][opponent_key]
+                    is_ranked = True
+
+                team_score = game.get_score_for_team(team_name)
+                opponent_score = game.get_score_for_team(opponent_name)
                 score_str = (
-                    f"{oklahoma_score} - {opponent_score}"
-                    if g.home_points is not None and g.away_points is not None
+                    f"{team_score} - {opponent_score}"
+                    if team_score is not None and opponent_score is not None
                     else "TBD"
                 )
 
+                location = game.get_location_for_team(team_name)
+                location_display = "Home" if location == "H" else ("Neutral" if location == "N" else "Away")
+
+                result = game.get_result_for_team(team_name) or ""
+
                 schedule.append({
-                    "id": game.id,  # Add the game ID for clickable links
+                    "id": game.id,
                     "date": g.start_date,
                     "opponent": opponent_name,
-                    "location": "Home" if is_home else ("Neutral" if bool(getattr(g, 'neutral_site', False)) else "Away"),
+                    "location": location_display,
                     "score": score_str,
                     "result": result,
                     "is_ranked": is_ranked,

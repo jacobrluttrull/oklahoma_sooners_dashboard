@@ -7,3 +7,8 @@ __pycache__/
 *.pyd
 *.swp
 *.swo
+
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.*.local

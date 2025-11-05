@@ -26,9 +26,10 @@ class Game(models.Model):
         ('N', 'Neutral'),
     ]
 
-    opponent = models.ForeignKey(Team, on_delete=models.CASCADE)
+    # Legacy Oklahoma-centric fields (deprecated - use normalized fields instead)
+    opponent = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
     date = models.DateField()
-    home_away = models.CharField(max_length=1, choices=HOME_AWAY_CHOICES, default='H')
+    home_away = models.CharField(max_length=1, choices=HOME_AWAY_CHOICES, blank=True)
     oklahoma_score = models.PositiveIntegerField(null=True, blank=True)
     opponent_score = models.PositiveIntegerField(null=True, blank=True)
     result = models.CharField(max_length=1, choices=RESULT_CHOICES, blank=True)
@@ -62,12 +63,96 @@ class Game(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        score_str = (
-            f"{self.oklahoma_score} - {self.opponent_score}"
-            if self.oklahoma_score is not None and self.opponent_score is not None
-            else "TBD"
-        )
-        return f"Oklahoma {score_str} {self.opponent.name} ({self.date})"
+        # Use normalized fields for display
+        if self.home_team and self.away_team:
+            score_str = (
+                f"{self.home_points} - {self.away_points}"
+                if self.home_points is not None and self.away_points is not None
+                else "TBD"
+            )
+            return f"{self.home_team.name} {score_str} {self.away_team.name} ({self.date})"
+        # Fallback to legacy Oklahoma-centric format if available
+        elif self.opponent:
+            score_str = (
+                f"{self.oklahoma_score} - {self.opponent_score}"
+                if self.oklahoma_score is not None and self.opponent_score is not None
+                else "TBD"
+            )
+            return f"Oklahoma {score_str} {self.opponent.name} ({self.date})"
+        else:
+            return f"Game on {self.date}"
+
+    def get_opponent(self, team_name):
+        """Get the opponent team for a given team in this game.
+
+        Args:
+            team_name: Name of the team (e.g., "Oklahoma")
+
+        Returns:
+            Team object of the opponent, or None if team not in game
+        """
+        if self.home_team and self.home_team.name == team_name:
+            return self.away_team
+        elif self.away_team and self.away_team.name == team_name:
+            return self.home_team
+        return None
+
+    def get_score_for_team(self, team_name):
+        """Get the score for a specific team in this game.
+
+        Args:
+            team_name: Name of the team (e.g., "Oklahoma")
+
+        Returns:
+            Integer score for that team, or None if team not in game
+        """
+        if self.home_team and self.home_team.name == team_name:
+            return self.home_points
+        elif self.away_team and self.away_team.name == team_name:
+            return self.away_points
+        return None
+
+    def get_location_for_team(self, team_name):
+        """Returns whether the game is Home, Away, or Neutral for a team.
+
+        Args:
+            team_name: Name of the team (e.g., "Oklahoma")
+
+        Returns:
+            'H' for home, 'A' for away, 'N' for neutral, or None if team not in game
+        """
+        if self.neutral_site:
+            return 'N'
+        if self.home_team and self.home_team.name == team_name:
+            return 'H'
+        if self.away_team and self.away_team.name == team_name:
+            return 'A'
+        return None
+
+    def get_result_for_team(self, team_name):
+        """Returns the result (W/L) for a specific team in this game.
+
+        Args:
+            team_name: Name of the team (e.g., "Oklahoma")
+
+        Returns:
+            'W' for win, 'L' for loss, or None if game incomplete or team not in game
+        """
+        if self.home_points is None or self.away_points is None:
+            return None
+
+        team_score = self.get_score_for_team(team_name)
+        opponent = self.get_opponent(team_name)
+
+        if team_score is None or opponent is None:
+            return None
+
+        opponent_score = self.get_score_for_team(opponent.name)
+
+        if opponent_score is None:
+            return None
+
+        return 'W' if team_score > opponent_score else 'L'
 
     class Meta:
         ordering = ['-date']

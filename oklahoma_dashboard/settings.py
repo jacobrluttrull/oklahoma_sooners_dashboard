@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 
@@ -21,12 +22,44 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-$hxx*v^9j&%&s+g3$bq^ki4805tiddu#o$ne9#1!=@g-3@z=92'
+# Get SECRET_KEY from environment variable, fallback to insecure key for development only
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-$hxx*v^9j&%&s+g3$bq^ki4805tiddu#o$ne9#1!=@g-3@z=92'  # DEV ONLY
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Set DEBUG=False in production by setting environment variable DEBUG=False
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+# SECURITY WARNING: set ALLOWED_HOSTS in production
+# Example: ALLOWED_HOSTS=yourdomain.com,www.yourdomain.com
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+# Validate that SECRET_KEY is changed in production
+if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
+    raise ValueError(
+        "You must set DJANGO_SECRET_KEY environment variable in production! "
+        "Generate one with: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'"
+    )
+
+# Security settings for production
+if not DEBUG:
+    # Force HTTPS in production
+    SECURE_SSL_REDIRECT = True
+    # Ensure session cookies are only sent over HTTPS
+    SESSION_COOKIE_SECURE = True
+    # Ensure CSRF cookies are only sent over HTTPS
+    CSRF_COOKIE_SECURE = True
+    # Enable HTTP Strict Transport Security (HSTS)
+    # This tells browsers to only access the site over HTTPS for the next year
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    # Prevent browsers from guessing content types
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # Enable XSS protection in older browsers
+    SECURE_BROWSER_XSS_FILTER = True
 
 
 # Application definition
