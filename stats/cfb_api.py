@@ -130,7 +130,6 @@ def prettify_stat_name(name: str) -> str:
         # Look ahead up to 3 tokens
         for n in (3, 2, 1):
             if i + n <= L:
-                candidate = ''.join(raw_tokens[i:i+n])
                 # normalize candidate by removing non-alphanumeric characters
                 candidate_norm = ''.join(re.sub(r'[^A-Za-z0-9]', '', c) for c in raw_tokens[i:i+n])
                 key = candidate_norm.lower()
